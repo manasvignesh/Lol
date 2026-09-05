@@ -2,6 +2,7 @@ node_modules/
 dist/
 public/wasm/
 public/models/
+public/pose-worker.js
 test-results/
 playwright-report/
 *.log
