@@ -1,21 +1,23 @@
 import { C, type Settings } from "./config";
-import { clamp, len, sub, v, mix, sweptDistance, type V3 } from "./math";
+import { clamp, len, v, mix, sweptDistance, type V3 } from "./math";
 import {
   integrate,
   inCourt,
   netCrossing,
-  predict,
+  predictInterception,
   shotVelocity,
   MatchManager,
   type Shuttle,
 } from "./physics";
 import { neutralMotion, type Motion, type Intent } from "./motion";
+
 export type GameEvent = {
   type: "hit" | "point" | "net" | "serve" | "swing";
   text: string;
   position?: V3;
   speed?: number;
 };
+
 export class OpponentAI {
   x = 0;
   z = -3.9;
@@ -23,16 +25,15 @@ export class OpponentAI {
   timer = 0;
   target = v(0, 1.4, -3.9);
   attempted = false;
+
   incoming(s: Shuttle, settings: Settings) {
-    const pts = predict(s);
-    this.target =
-      pts.find((p) => p.z < -1.0 && p.y < 1.8 && p.y > 0.4) ??
-      pts[pts.length - 1] ??
-      s.p;
+    const interception = predictInterception(s, false);
+    this.target = interception.target;
     this.timer = C.ai[settings.difficulty].reaction;
     this.state = "WAIT";
     this.attempted = false;
   }
+
   update(dt: number, settings: Settings) {
     this.timer -= dt;
     if (this.state === "WAIT" && this.timer <= 0) this.state = "MOVE";
@@ -46,6 +47,7 @@ export class OpponentAI {
     }
   }
 }
+
 export class Game {
   match = new MatchManager();
   ai = new OpponentAI();
@@ -61,47 +63,147 @@ export class Game {
   hits = 0;
   bestRally = 0;
   totalHits = 0;
+
+  // Auto-footwork player positioning
+  playerPos: V3 = v(0, 0, C.playerBase.z);
+  targetPos: V3 = v(0, 0, C.playerBase.z);
+  footworkState: "READY" | "INTERCEPTING" | "RECOVERING" = "READY";
   playerX = 0;
+
   racket = v(0.5, 1.5, 3.4);
   previousRacket = { ...this.racket };
   motion = neutralMotion();
   usedSwing = -1;
+  primedSwing: { id: number; intent: Intent; time: number } | null = null;
   lastContact = -10;
   events: GameEvent[] = [];
   lastShot = "READY";
+
   constructor(
     public settings: Settings,
     public random = Math.random,
   ) {}
+
   setMotion(m: Motion) {
     this.motion = m;
   }
+
   reset() {
     this.match = new MatchManager();
     this.ai = new OpponentAI();
     this.hits = 0;
     this.bestRally = 0;
     this.totalHits = 0;
+    this.playerPos = v(0, 0, C.playerBase.z);
+    this.targetPos = v(0, 0, C.playerBase.z);
+    this.footworkState = "READY";
     this.ready();
   }
+
   ready() {
     this.state = "ready";
     this.timer = 0;
     this.usedSwing = this.motion.swingId;
+    this.primedSwing = null;
     this.shuttle.velocity = v();
     this.hits = 0;
+    this.footworkState = "READY";
+    this.targetPos = v(0, 0, C.playerBase.z);
     this.lastShot =
       this.match.server === 0 ? "SWING TO SERVE" : "OPPONENT SERVING";
   }
+
   step(dt: number) {
     this.time += dt;
     this.timer += dt;
     this.previousRacket = { ...this.racket };
-    this.playerX +=
-      (this.motion.playerX - this.playerX) * (1 - Math.exp(-dt * 18));
-    this.racket = mix(this.racket, this.motion.racket, 1 - Math.exp(-dt * 35));
+
+    // --- Auto Footwork & Intent Blending ---
+    if (
+      this.state === "rally" &&
+      this.shuttle.lastHit === 1 &&
+      this.shuttle.p.z > -0.5
+    ) {
+      const interception = predictInterception(this.shuttle, true);
+      let targetX = interception.target.x;
+      let targetZ = interception.target.z;
+
+      // Small intent adjustments to target positioning
+      if (this.motion.intentDirection === "front") targetZ -= 0.35;
+      else if (this.motion.intentDirection === "back") targetZ += 0.35;
+
+      this.targetPos = v(
+        clamp(targetX, -2.4, 2.4),
+        0,
+        clamp(targetZ, 1.8, 5.6),
+      );
+      this.footworkState = "INTERCEPTING";
+    } else if (this.state === "rally" && this.shuttle.lastHit === 0) {
+      this.footworkState = "RECOVERING";
+      this.targetPos = v(0, 0, C.playerBase.z);
+    } else if (this.state === "ready" || this.state === "point") {
+      this.footworkState = "READY";
+      this.targetPos = v(0, 0, C.playerBase.z);
+    }
+
+    // Determine movement speed according to state and intent
+    let moveSpeed =
+      this.footworkState === "INTERCEPTING"
+        ? C.playerSpeed[this.settings.assist] * this.settings.movement
+        : C.recoverySpeed[this.settings.assist] * this.settings.movement;
+
+    if (this.footworkState === "INTERCEPTING") {
+      const dx = this.targetPos.x - this.playerPos.x;
+      const intentDir = this.motion.intentDirection;
+
+      // Intent boost when player intent agrees with shuttle direction
+      if (
+        (intentDir === "right" && dx > 0.15) ||
+        (intentDir === "left" && dx < -0.15)
+      ) {
+        moveSpeed *= C.intentBoost;
+      }
+      // Intent penalty if player leans in the opposite direction
+      else if (
+        (intentDir === "right" && dx < -0.3) ||
+        (intentDir === "left" && dx > 0.3)
+      ) {
+        moveSpeed *= C.intentPenalty[this.settings.assist];
+      }
+    }
+
+    const maxStep = moveSpeed * dt;
+    this.playerPos.x += clamp(
+      this.targetPos.x - this.playerPos.x,
+      -maxStep,
+      maxStep,
+    );
+    this.playerPos.z += clamp(
+      this.targetPos.z - this.playerPos.z,
+      -maxStep,
+      maxStep,
+    );
+    this.playerPos.x = clamp(this.playerPos.x, -2.4, 2.4);
+    this.playerPos.z = clamp(this.playerPos.z, 1.8, 5.8);
+    this.playerX = this.playerPos.x;
+
+    // Attach racket smoothly to moving avatar position
+    const armRel = v(
+      this.motion.racket.x - this.motion.playerX,
+      this.motion.racket.y,
+      this.motion.racket.z - 3.45,
+    );
+    const targetRacket = v(
+      this.playerPos.x + armRel.x,
+      clamp(armRel.y, 0.25, 3.5),
+      this.playerPos.z - 0.4 + armRel.z,
+    );
+    this.racket = mix(this.racket, targetRacket, 1 - Math.exp(-dt * 35));
+
     this.ai.update(dt, this.settings);
+
     if (this.state === "over") return;
+
     if (this.state === "point") {
       if (this.timer > 1.7) {
         if (this.match.winner !== null) this.state = "over";
@@ -109,31 +211,39 @@ export class Game {
       }
       return;
     }
+
     if (this.state === "ready") {
       const side = this.match.server;
       this.shuttle.p =
         side === 0
-          ? v(this.playerX + 0.3, 1.15, 3.15)
+          ? v(this.playerPos.x + 0.3, 1.15, this.playerPos.z - 0.85)
           : v(this.ai.x, 1.15, this.ai.z);
       this.shuttle.prev = { ...this.shuttle.p };
+
       if (
         side === 0 &&
-        this.motion.swing &&
+        (this.motion.swing || this.motion.predictedSwing) &&
         this.motion.confidence > C.confidence &&
         this.motion.swingId !== this.usedSwing
       ) {
         this.usedSwing = this.motion.swingId;
         this.hit(0, "serve");
-      } else if (side === 1 && this.timer > 1.5) this.hit(1, "serve");
+      } else if (side === 1 && this.timer > 1.5) {
+        this.hit(1, "serve");
+      }
       return;
     }
+
+    // --- Shuttle Flight & Faults ---
     integrate(this.shuttle, dt);
     const s = this.shuttle;
+
     if (netCrossing(s.prev, s.p)) {
       this.events.push({ type: "net", text: "Net", position: { ...s.p } });
       this.point((1 - s.lastHit) as 0 | 1, "NET");
       return;
     }
+
     if (s.p.y <= 0.03) {
       this.point(
         inCourt(s.p) ? (s.p.z > 0 ? 1 : 0) : ((1 - s.lastHit) as 0 | 1),
@@ -141,32 +251,70 @@ export class Game {
       );
       return;
     }
+
     if (Math.abs(s.p.z) > 10 || Math.abs(s.p.x) > 7) {
       this.point((1 - s.lastHit) as 0 | 1, "OUT");
       return;
     }
+
+    // --- Swing Priming & Assisted Contact Envelope ---
+    const isSwinging =
+      (this.motion.swing || this.motion.predictedSwing) &&
+      this.motion.confidence > C.confidence &&
+      this.motion.swingId !== this.usedSwing;
+
+    if (isSwinging) {
+      this.primedSwing = {
+        id: this.motion.swingId,
+        intent: this.motion.intent,
+        time: this.time,
+      };
+    }
+
+    // Check if primed swing is still valid inside timing window
+    if (
+      this.primedSwing &&
+      this.time - this.primedSwing.time > C.timingWindow[this.settings.assist]
+    ) {
+      this.primedSwing = null;
+    }
+
     if (
       s.lastHit === 1 &&
       s.p.z > 0.2 &&
-      this.motion.swing &&
-      this.motion.confidence > C.confidence &&
-      this.motion.swingId !== this.usedSwing &&
+      this.primedSwing &&
+      this.primedSwing.id !== this.usedSwing &&
       this.time - this.lastContact > 0.18
     ) {
-      const assistance =
-        C.assist[this.settings.assist] * (0.7 + 0.3 * this.motion.confidence);
-      const radius = 0.3 + assistance + Math.min(0.15, len(s.velocity) * 0.006);
+      const radius =
+        C.contactEnvelope[this.settings.assist] *
+        (0.75 + 0.25 * this.motion.confidence);
+
       const contact = sweptDistance(
         this.previousRacket,
         this.racket,
         s.prev,
         s.p,
       );
-      if (contact.distance < radius) {
-        this.usedSwing = this.motion.swingId;
-        this.hit(0, this.motion.intent);
+      const playerDist = Math.hypot(
+        s.p.x - this.playerPos.x,
+        s.p.z - this.playerPos.z,
+      );
+
+      // Contact succeeds if shuttle enters reachable envelope around avatar or racket
+      if (
+        contact.distance < radius ||
+        (playerDist < radius && s.p.y > 0.25 && s.p.y < 3.3)
+      ) {
+        this.usedSwing = this.primedSwing.id;
+        const hitIntent = this.primedSwing.intent;
+        this.primedSwing = null;
+        this.hit(0, hitIntent);
+        this.footworkState = "RECOVERING";
       }
     }
+
+    // --- Opponent Return Logic ---
     if (
       s.lastHit === 0 &&
       s.p.z < -0.6 &&
@@ -186,6 +334,7 @@ export class Game {
       this.ai.state = "RECOVER";
     }
   }
+
   hit(side: 0 | 1, intent: Intent | "serve") {
     const s = this.shuttle;
     const incomingSpeed = len(s.velocity);
@@ -193,33 +342,43 @@ export class Game {
     const power =
       side === 0
         ? clamp(
-            this.motion.power * 0.9 +
-              incomingSpeed / 150 -
-              Math.abs(timing) * 0.08,
-            0.12,
+            this.motion.power * 0.92 +
+              incomingSpeed / 140 -
+              Math.abs(timing) * 0.06,
+            0.15,
             1,
           )
         : 0.55;
     const sign = side === 0 ? -1 : 1;
-    // Beginner AI aims within the player's reachable depth. Lateral placement still requires movement.
+
     const depth = intent === "drop" ? 2.8 : intent === "smash" ? 4.2 : 5.1;
-    const aim =
-      side === 0
-        ? clamp(
-            this.motion.direction.x * 1.7 + this.playerX * 0.15 + timing * 0.22,
-            -2.2,
-            2.2,
-          )
-        : clamp(-this.playerX * 0.25 + (this.random() - 0.5) * 2.5, -1.8, 1.8);
+
+    // Directional aim from swing direction and body intent
+    let aim = 0;
+    if (side === 0) {
+      aim =
+        this.motion.direction.x * 1.8 + this.playerPos.x * 0.12 + timing * 0.18;
+      if (this.motion.intentDirection === "left") aim -= 0.5;
+      else if (this.motion.intentDirection === "right") aim += 0.5;
+      aim = clamp(aim, -2.2, 2.2);
+    } else {
+      aim = clamp(
+        -this.playerPos.x * 0.25 + (this.random() - 0.5) * 2.5,
+        -1.8,
+        1.8,
+      );
+    }
+
     const error =
       side === 0
         ? 0
         : C.ai[this.settings.difficulty].error * (this.random() - 0.5);
     const target = v(aim + error, 0.03, sign * depth);
-    // Low contact cannot support a real downward smash; lift it over the net.
+
     if (intent === "smash" && s.p.y < 2.3) intent = "drive";
     let velocity = shotVelocity(s.p, target, intent, power);
-    // Ensure nominal assisted trajectories clear the net; collision remains active for real faults.
+
+    // Assisted net clearance
     const trial: Shuttle = {
       p: { ...s.p },
       prev: { ...s.p },
@@ -237,6 +396,7 @@ export class Game {
       }
       if (trial.p.y < 0) break;
     }
+
     s.velocity = velocity;
     s.lastHit = side;
     this.state = "rally";
@@ -251,13 +411,22 @@ export class Game {
       position: { ...s.p },
       speed: len(velocity) * 3.6,
     });
-    if (side === 0) this.ai.incoming(s, this.settings);
+
+    if (side === 0) {
+      this.ai.incoming(s, this.settings);
+    } else {
+      const interception = predictInterception(s, true);
+      this.targetPos = interception.target;
+      this.footworkState = "INTERCEPTING";
+    }
   }
+
   point(side: 0 | 1, reason: string) {
     this.match.point(side);
     this.state = "point";
     this.timer = 0;
     this.lastShot = reason;
+    this.primedSwing = null;
     this.events.push({
       type: "point",
       text: `${side === 0 ? "YOUR" : "OPPONENT"} POINT · ${reason}`,

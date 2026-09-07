@@ -1,7 +1,7 @@
 import * as T from "three";
 import type { Game } from "./game";
 import { predict } from "./physics";
-import type { V3 } from "./math";
+import { clamp, type V3 } from "./math";
 export class CourtRenderer {
   scene = new T.Scene();
   camera = new T.PerspectiveCamera(47, 1, 0.1, 100);
@@ -269,9 +269,14 @@ export class CourtRenderer {
     this.cameraShake = power > 85 ? 0.07 : 0;
   }
   render(game: Game, dt: number) {
-    this.player.position.set(game.playerX, 0, 4.05);
+    this.player.position.set(game.playerPos.x, 0, game.playerPos.z);
     this.opponent.position.set(game.ai.x, 0, game.ai.z);
-    this.player.rotation.z = -(game.motion.playerX - game.playerX) * 0.08;
+    const lateralVelocity = game.targetPos.x - game.playerPos.x;
+    this.player.rotation.z = clamp(
+      -lateralVelocity * 0.12 + game.motion.lean * 0.2,
+      -0.35,
+      0.35,
+    );
     this.racket.position.set(game.racket.x, game.racket.y, game.racket.z);
     this.racket.rotation.z = -Math.atan2(
       game.motion.forearm.x,
@@ -281,9 +286,9 @@ export class CourtRenderer {
       .applyQuaternion(this.racket.quaternion)
       .add(this.racket.position);
     const shoulder = new T.Vector3(
-      game.playerX + (game.racket.x > game.playerX ? 0.2 : -0.2),
+      game.playerPos.x + (game.racket.x > game.playerPos.x ? 0.2 : -0.2),
       1.3,
-      4.05,
+      game.playerPos.z,
     );
     const elbow = shoulder.clone().lerp(hand, 0.5);
     elbow.y -= 0.12;

@@ -70,13 +70,6 @@ try {
   );
   await setPose(0.3, 0.18);
   await page.waitForFunction(() =>
-    document.querySelector("#calibration-message").textContent.includes("Sway"),
-  );
-  for (let i = 0; i < 40; i++) {
-    await setPose(0.3, 0.57, Math.sin(i * 0.22) * 0.085);
-    await page.waitForTimeout(85);
-  }
-  await page.waitForFunction(() =>
     document
       .querySelector("#calibration-message")
       .textContent.includes("Extend"),

@@ -1,7 +1,9 @@
 import { C } from "./config";
 import { add, sub, mul, len, norm, dot, clamp, mix, v, type V3 } from "./math";
+
 export type Landmark = V3 & { visibility?: number };
 export type Pose = Landmark[];
+
 export type Calibration = {
   center: V3;
   width: number;
@@ -9,13 +11,17 @@ export type Calibration = {
   range: number;
   reach: number;
 };
+
 export type Intent = "clear" | "drive" | "drop" | "smash" | "lift";
+export type IntentDirection = "left" | "right" | "center" | "front" | "back";
+
 export type SwingState =
   | "IDLE"
   | "PREPARING"
   | "SWINGING"
   | "FOLLOW_THROUGH"
   | "COOLDOWN";
+
 export type Motion = {
   time: number;
   confidence: number;
@@ -26,6 +32,10 @@ export type Motion = {
   power: number;
   direction: V3;
   intent: Intent;
+  intentDirection: IntentDirection;
+  intentWeight: number;
+  preparation: "high" | "low" | "neutral" | "back";
+  predictedSwing: boolean;
   swing: boolean;
   swingId: number;
   state: SwingState;
@@ -41,6 +51,7 @@ export type Motion = {
   plane: string;
   phase: "start" | "peak" | "end" | "none";
 };
+
 export const neutralMotion = (): Motion => ({
   time: 0,
   confidence: 0,
@@ -51,6 +62,10 @@ export const neutralMotion = (): Motion => ({
   power: 0,
   direction: v(),
   intent: "clear",
+  intentDirection: "center",
+  intentWeight: 0,
+  preparation: "neutral",
+  predictedSwing: false,
   swing: false,
   swingId: 0,
   state: "IDLE",
@@ -66,6 +81,7 @@ export const neutralMotion = (): Motion => ({
   plane: "horizontal",
   phase: "none",
 });
+
 export function poseQuality(p: Pose | undefined) {
   if (!p || p.length < 33) return 0;
   return Math.min(
@@ -74,10 +90,13 @@ export function poseQuality(p: Pose | undefined) {
     ),
   );
 }
+
 export const bodyCenter = (p: Pose) =>
   mix(mix(p[11], p[12], 0.5), mix(p[23], p[24], 0.5), 0.5);
+
 export const shoulderWidth = (p: Pose) =>
   Math.max(0.06, Math.hypot(p[11].x - p[12].x, p[11].y - p[12].y));
+
 export class PoseFilter {
   last: Pose | null = null;
   time = 0;
@@ -98,33 +117,95 @@ export class PoseFilter {
     return this.last;
   }
 }
+
+type MotionSample = {
+  time: number;
+  speed: number;
+  accel: number;
+  velocity: V3;
+  purposeful: boolean;
+};
+
 export class SwingDetector {
   state: SwingState = "IDLE";
   id = 0;
   elapsed = 0;
   peak = 0;
   phase: Motion["phase"] = "none";
+  predicted = false;
+  history: MotionSample[] = [];
+
   reset() {
     this.state = "IDLE";
     this.elapsed = 0;
     this.peak = 0;
+    this.phase = "none";
+    this.predicted = false;
+    this.history = [];
   }
-  update(speed: number, dt: number, purposeful: boolean) {
+
+  update(
+    speed: number,
+    dt: number,
+    purposeful: boolean,
+    accel: V3 = v(),
+    time = 0,
+  ) {
     this.elapsed += dt;
     this.phase = "none";
+    this.predicted = false;
+
+    const accelMag = len(accel);
+    this.history.push({
+      time,
+      speed,
+      accel: accelMag,
+      velocity: accel,
+      purposeful,
+    });
+    while (
+      this.history.length > 0 &&
+      time - this.history[0].time > C.swingHistoryMs
+    ) {
+      this.history.shift();
+    }
+
+    const recentAccelerationSurge =
+      this.history.some((h) => h.accel > C.swingAccelTrigger) && purposeful;
+
     const enter = (s: SwingState) => {
       this.state = s;
       this.elapsed = 0;
     };
-    if (this.state === "IDLE" && speed > C.swingStart && purposeful)
-      enter("PREPARING");
+
+    if (this.state === "IDLE") {
+      if (
+        (speed > C.swingStart ||
+          (recentAccelerationSurge && speed > C.swingStart * 0.65)) &&
+        purposeful
+      ) {
+        enter("PREPARING");
+      }
+    }
+
     if (this.state === "PREPARING") {
-      if (speed > C.swingPeak && purposeful) {
+      if (
+        (speed > C.swingPeak ||
+          (recentAccelerationSurge && speed > C.swingPeak * 0.75)) &&
+        purposeful
+      ) {
         enter("SWINGING");
         this.id++;
         this.peak = speed;
         this.phase = "start";
-      } else if (speed < C.swingEnd || this.elapsed > 0.35) enter("IDLE");
+        this.predicted = true;
+      } else if (
+        speed < C.swingEnd &&
+        !recentAccelerationSurge &&
+        this.elapsed > 0.35
+      ) {
+        enter("IDLE");
+      }
     } else if (this.state === "SWINGING") {
       if (speed > this.peak) {
         this.peak = speed;
@@ -134,16 +215,23 @@ export class SwingDetector {
         enter("FOLLOW_THROUGH");
         this.phase = "end";
       }
-    } else if (this.state === "FOLLOW_THROUGH" && this.elapsed > 0.12)
-      enter("COOLDOWN");
-    else if (this.state === "COOLDOWN" && this.elapsed > C.cooldown)
-      enter("IDLE");
+    } else if (this.state === "FOLLOW_THROUGH") {
+      if (this.elapsed > 0.12) {
+        enter("COOLDOWN");
+      }
+    } else if (this.state === "COOLDOWN") {
+      if (this.elapsed > C.cooldown) {
+        enter("IDLE");
+      }
+    }
+
     return (
       this.state === "SWINGING" ||
-      (this.state === "FOLLOW_THROUGH" && this.elapsed < 0.075)
+      (this.state === "FOLLOW_THROUGH" && this.elapsed < 0.08)
     );
   }
 }
+
 export function classify(
   direction: V3,
   speed: number,
@@ -155,6 +243,7 @@ export function classify(
   if (wristHeight > 1.9 || direction.y > 0.3) return "clear";
   return "drive";
 }
+
 export class MotionInterpreter {
   filter = new PoseFilter();
   detector = new SwingDetector();
@@ -169,6 +258,7 @@ export class MotionInterpreter {
     range: 0.15,
     reach: 1.8,
   };
+
   reset() {
     this.filter.reset();
     this.detector.reset();
@@ -177,6 +267,7 @@ export class MotionInterpreter {
     this.previousTime = 0;
     this.previousVelocity = v();
   }
+
   update(
     raw: Pose,
     time: number,
@@ -188,15 +279,17 @@ export class MotionInterpreter {
       return null;
     }
     if (time - this.previousTime > C.staleMs) this.reset();
-    const p = this.filter.update(raw, time),
-      c = this.calibration;
-    const right = c.hand === "right",
-      s = p[right ? 12 : 11],
-      e = p[right ? 14 : 13],
-      w = p[right ? 16 : 15];
-    const center = bodyCenter(p),
-      width = c.width,
-      dt = clamp((time - this.previousTime) / 1000, 1 / 120, 0.1);
+
+    const p = this.filter.update(raw, time);
+    const c = this.calibration;
+    const right = c.hand === "right";
+    const s = p[right ? 12 : 11];
+    const e = p[right ? 14 : 13];
+    const w = p[right ? 16 : 15];
+    const center = bodyCenter(p);
+    const width = c.width;
+    const dt = clamp((time - this.previousTime) / 1000, 1 / 120, 0.1);
+
     // Mirrored display coordinates, shoulder-relative motion rejects torso translation.
     const relative = v(-(w.x - s.x) / width, -(w.y - s.y) / width, 0);
     let velocity = this.previousWrist
@@ -204,10 +297,54 @@ export class MotionInterpreter {
       : v();
     velocity = mul(norm(velocity), Math.min(18, len(velocity)));
     const speed = len(velocity) * sensitivity;
-    const upper = norm(v(-(e.x - s.x), -(e.y - s.y), 0)),
-      forearm = norm(v(-(w.x - e.x), -(w.y - e.y), 0));
+
+    const acceleration = mul(sub(velocity, this.previousVelocity), 1 / dt);
+
+    const upper = norm(v(-(e.x - s.x), -(e.y - s.y), 0));
+    const forearm = norm(v(-(w.x - e.x), -(w.y - e.y), 0));
     const elbowAngle =
       (Math.acos(clamp(dot(mul(upper, -1), forearm), -1, 1)) * 180) / Math.PI;
+
+    // Detect small body signals / intent without requiring room displacement
+    // Lean calculation: torso tilt (shoulder midpoint vs hip midpoint)
+    const shoulderMid = mix(p[11], p[12], 0.5);
+    const hipMid = mix(p[23], p[24], 0.5);
+    const lean = -(shoulderMid.x - hipMid.x) / width;
+    const bodyShiftX = -(center.x - c.center.x) / width;
+    const vertical = (c.center.y - center.y) / width;
+    const reach = len(relative);
+
+    // Intent direction determination:
+    let intentDirection: IntentDirection = "center";
+    let intentWeight = 0;
+    const lateralSignal = lean * 0.7 + bodyShiftX * 0.3;
+
+    if (lateralSignal > C.intentLeanThreshold) {
+      intentDirection = "right";
+      intentWeight = clamp(lateralSignal / 0.35, 0.2, 1.0);
+    } else if (lateralSignal < -C.intentLeanThreshold) {
+      intentDirection = "left";
+      intentWeight = clamp(-lateralSignal / 0.35, 0.2, 1.0);
+    } else if (
+      reach > 1.2 &&
+      elbowAngle > 70 &&
+      relative.y > -0.2 &&
+      relative.y < 0.4
+    ) {
+      intentDirection = "front";
+      intentWeight = clamp(reach / 1.4, 0.2, 1.0);
+    } else if (relative.y > 0.6 && elbowAngle > 80) {
+      intentDirection = "back";
+      intentWeight = clamp(relative.y / 1.0, 0.2, 1.0);
+    }
+
+    // Preparation posture:
+    let preparation: Motion["preparation"] = "neutral";
+    if (relative.y > 0.5 && elbowAngle > 70) preparation = "high";
+    else if (relative.y < -0.3) preparation = "low";
+    else if (elbowAngle < 60) preparation = "back";
+
+    // Virtual racket placement attached to forearm
     const displacement =
       -(center.x - c.center.x) / Math.max(c.range, width * 0.4);
     const playerX = clamp(displacement * 2.1 * movement, -2.35, 2.35);
@@ -220,9 +357,23 @@ export class MotionInterpreter {
       clamp(1.5 + relative.y * 0.65 + forearm.y * C.racketLength, 0.25, 3.5),
       3.45 - clamp(Math.abs(relative.x) * 0.2, 0, 0.45),
     );
+
     const purposeful = len(relative) > 0.45 && elbowAngle > 35;
-    const swing = this.detector.update(speed, dt, purposeful);
-    const direction = norm(velocity);
+    const swing = this.detector.update(
+      speed,
+      dt,
+      purposeful,
+      acceleration,
+      time,
+    );
+
+    // Extrapolate direction if swinging with acceleration
+    const predictedDirection = norm(
+      add(velocity, mul(acceleration, C.predictionLookahead)),
+    );
+    const direction =
+      len(velocity) > 0.1 ? norm(velocity) : norm(predictedDirection);
+
     const out: Motion = {
       time,
       confidence: poseQuality(raw),
@@ -233,32 +384,38 @@ export class MotionInterpreter {
       power: clamp(speed / 10, 0.12, 1),
       direction,
       intent: classify(direction, speed, racket.y),
+      intentDirection,
+      intentWeight,
+      preparation,
+      predictedSwing: this.detector.predicted,
       swing,
       swingId: this.detector.id,
       state: this.detector.state,
       elbowAngle,
       forearm,
       upperArm: upper,
-      lean: (mix(p[11], p[12], 0.5).x - mix(p[23], p[24], 0.5).x) / width,
-      vertical: (c.center.y - center.y) / width,
+      lean,
+      vertical,
       shoulderOrientation: Math.atan2(p[12].z - p[11].z, p[12].x - p[11].x),
       torsoOrientation: Math.atan2(
         center.x - c.center.x,
         c.center.y - center.y,
       ),
-      reach: len(relative),
-      acceleration: mul(sub(velocity, this.previousVelocity), 1 / dt),
+      reach,
+      acceleration,
       plane: Math.abs(direction.y) > 0.6 ? "vertical" : "horizontal",
       phase: this.detector.phase,
     };
+
     this.previousWrist = relative;
     this.previousVelocity = velocity;
     this.previousTime = time;
     this.history.push(out);
-    if (this.history.length > 18) this.history.shift();
+    if (this.history.length > 24) this.history.shift();
     return out;
   }
 }
+
 export class CalibrationManager {
   stage = 0;
   progress = 0;
@@ -267,15 +424,13 @@ export class CalibrationManager {
   hand: "left" | "right" = "right";
   center = v();
   width = 0.2;
-  min = 1;
-  max = 0;
   reach = 0;
   messages = [
     "Stand centered. Relax your arms.",
     "Raise only your racket hand.",
-    "Sway a little left, then right.",
     "Extend your racket arm comfortably.",
   ];
+
   update(
     p: Pose | undefined,
     dt: number,
@@ -284,8 +439,9 @@ export class CalibrationManager {
       this.held = 0;
       return { message: "Keep shoulders, elbows, wrists and hips in frame." };
     }
-    const pose = p!,
-      width = shoulderWidth(pose);
+    const pose = p!;
+    const width = shoulderWidth(pose);
+
     if (width > 0.46) {
       this.held = 0;
       return { message: "Step back a little — leave room for your arms." };
@@ -302,10 +458,11 @@ export class CalibrationManager {
       this.held = 0;
       return { message: "Keep both arms inside the camera frame." };
     }
+
     if (this.stage === 0) {
       this.samples.push(pose);
       this.held += dt;
-      if (this.held > 1.5) {
+      if (this.held > 1.2) {
         this.center = mul(
           this.samples.reduce((a, q) => add(a, bodyCenter(q)), v()),
           1 / this.samples.length,
@@ -316,41 +473,39 @@ export class CalibrationManager {
         this.next();
       }
     } else if (this.stage === 1) {
-      const left = pose[15].y < pose[11].y - 0.08,
-        right = pose[16].y < pose[12].y - 0.08;
+      const left = pose[15].y < pose[11].y - 0.08;
+      const right = pose[16].y < pose[12].y - 0.08;
       if (left !== right) {
         const hand = left ? "left" : "right";
         if (this.hand !== hand) this.held = 0;
         this.hand = hand;
         this.held += dt;
-        if (this.held > 0.9) this.next();
-      } else this.held = 0;
+        if (this.held > 0.8) this.next();
+      } else {
+        this.held = 0;
+      }
     } else if (this.stage === 2) {
-      const x = bodyCenter(pose).x;
-      this.min = Math.min(this.min, x);
-      this.max = Math.max(this.max, x);
-      this.held += dt;
-      if (this.held > 3 && this.max - this.min > this.width * 0.3) this.next();
-    } else if (this.stage === 3) {
-      const s = pose[this.hand === "right" ? 12 : 11],
-        w = pose[this.hand === "right" ? 16 : 15];
+      const s = pose[this.hand === "right" ? 12 : 11];
+      const w = pose[this.hand === "right" ? 16 : 15];
       this.reach = Math.max(this.reach, len(sub(s, w)) / this.width);
       if (this.reach > 1.15) this.held += dt;
-      if (this.held > 1)
+      if (this.held > 0.8) {
         return {
           message: "Ready to rally.",
           done: {
             center: this.center,
             width: this.width,
             hand: this.hand,
-            range: Math.max(this.width * 0.4, (this.max - this.min) / 2),
-            reach: this.reach,
+            range: Math.max(this.width * 0.45, 0.12),
+            reach: Math.max(this.reach, 1.2),
           },
         };
+      }
     }
-    this.progress = (this.stage + Math.min(this.held / 2, 0.95)) / 4;
+    this.progress = (this.stage + Math.min(this.held / 1.0, 0.95)) / 3;
     return { message: this.messages[this.stage] };
   }
+
   next() {
     this.stage++;
     this.held = 0;

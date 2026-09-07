@@ -1,18 +1,18 @@
 # Validation record
 
-Validated on Windows with Node 22.22.2 and installed Chrome, September 5, 2026. Commands run in the repository. No physical human webcam playtest was performed.
+Validated on Windows with Node 22.22.2 and installed Chrome, September 7, 2026. Commands run in the repository. No physical human webcam playtest was performed.
 
 ## Automated engine checks
 
-`npm test`: **22 passing tests**. Includes normalized motion at different body scales, whole-body movement rejection, swing lifecycle/cooldown, tracking-gap reset, automatic left-hand calibration, trajectory classification, swept contact, court lines/net, quadratic drag, six numerical shot profiles, 21-point/deuce/30-cap scoring, AI reaction states, synthetic pose-to-serve-to-AI-to-contact-to-score integration, no proximity-only/repeated-swing hits, and net/out attribution.
+`npm test`: **30 passing tests**. Includes body-scale normalized velocity, small torso lean directional intent detection, whole-body translation swing rejection, tracking-gap reset without spikes, streamlined 3-stage calibration, 5-class natural shot trajectory classification, landmark quality and shoulder measurement, auto-footwork avatar movement to predicted shuttle interception without room displacement, player lean acceleration commitment, post-shot central base recovery, early swing priming inside assisted timing windows, late swing misses, single swing ID collision consumption, Beginner vs Normal contact envelope comparison, swept contact, court boundaries/net crossings, quadratic drag, numerical shot profiles, rally scoring, AI reaction states, and net/out fault attribution.
 
-The sustained-rally test simulates eight seeded Normal opponents for 60 seconds each with interpolated idealized player inputs. Each produces rallies of at least four contacts and scores points without non-finite state. This is an engine stability/control-path test; the idealized controller is not a measurement of human difficulty.
+The sustained-rally test simulates eight seeded Normal opponents for 60 seconds each with auto-footwork player control. Each produces rallies of at least four contacts. This is an engine stability/control-path test; the idealized controller is not a measurement of human difficulty.
 
 ## Browser acceptance
 
 - `npm run test:browser`: real Three.js/WebGL rendering, keyboard serve, AI response, pause/settings return, synthetic interpreter serve, and actionable denied-camera error. No page errors. Production build tested at port 4173 as well as development at 5173.
 - `npm run test:camera`: actual MediaPipe Lite model and classic worker, official public pose image presented through `canvas.captureStream`, skeleton detection, neutral calibration advance, loss-of-person guidance after blank frames, and camera/worker release on Home. No page errors. Both development and production assets tested. This is genuine inference, but the image stream is prerecorded test media.
-- `npm run test:motion-flow`: all four calibration stages, automatic racket-hand choice, synthetic physical-style swing through the production interpreter, serve, tracking-loss pause, unchanged shuttle position while paused, and recovery without a false swing. Pose results are mocked deliberately; inference is tested independently above.
+- `npm run test:motion-flow`: streamlined 3-stage calibration flow (Position → Racket Hand → Reach/Intent), automatic racket-hand choice, synthetic physical-style swing through the production interpreter, serve, tracking-loss pause, unchanged shuttle position while paused, and recovery without a false swing. Pose results are mocked deliberately; inference is tested independently above.
 
 Screenshots were visually inspected for Home, active match and pose calibration. They confirm visible court/net, racket/shuttle, scores, useful prompts and local skeleton overlay. Browser outputs live in ignored `test-results/` and may be regenerated.
 

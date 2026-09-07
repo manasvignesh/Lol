@@ -1,6 +1,6 @@
 # Motion Badminton
 
-A playable local singles badminton prototype: your webcam tracks your body, your arm drives the racket, and deliberate swings return a drag-heavy shuttle against a heuristic opponent. No account, API key, cloud inference, or video upload. The intended moment is simple: see the shuttle, swing through it, feel the return.
+A playable local singles badminton prototype: your webcam tracks your body intent, your avatar handles the court traversal, and deliberate swings return a drag-heavy shuttle against a heuristic opponent. No account, API key, cloud inference, or video upload. The intended moment is simple: **play badminton from where you stand** (~1m × 1m area).
 
 **Status:** implemented and tested as a prototype. Actual MediaPipe inference has been verified using a public prerecorded image; the complete calibration/game/tracking-recovery path has been tested with synthetic pose fixtures. **A human webcam playtest and subjective “I hit that” validation have not been performed.** This is not a claim of production-quality gesture recognition.
 
@@ -31,28 +31,33 @@ Open **http://127.0.0.1:4173**. Do not open `index.html` directly from the files
 
 ## Camera and calibration
 
-Use a normal laptop or USB webcam, ideally 640×480 at 30 FPS. Face the camera in front lighting, with shoulders, elbows, wrists, and hips visible. Legs are tracked if visible but are not required. Avoid loose sleeves obscuring wrists. Leave clear space around you; stay approximately in place and do not jump.
+Use a normal laptop or USB webcam, ideally 640×480 at 30 FPS. Face the camera in front lighting, with shoulders, elbows, wrists, and hips visible. Legs are tracked if visible but are not required. Avoid loose sleeves obscuring wrists. Clear a comfortable arm-span around you; **stay in place (~1m area) and do not jump or take full-court steps.**
 
 1. Select **Play with camera** and allow browser camera access.
-2. Stand centered and relaxed for about 1.5 seconds.
-3. Raise **only your racket hand** above its shoulder and hold for one second. Either hand works; selection is automatic.
-4. Sway a little left and right for about three seconds. Both directions establish your movement range.
-5. Extend that arm comfortably for one second. The match starts automatically.
+2. **Position:** Stand centered and relaxed for about 1.2 seconds.
+3. **Racket hand:** Raise **only your racket hand** above its shoulder for about 0.8 seconds. Either hand works; selection is automatic.
+4. **Reach & Intent:** Extend that arm comfortably for about 0.8 seconds. The match starts automatically.
 
-Typical calibration is 7–12 seconds when landmarks remain visible. Prompts wait for valid observations rather than silently accepting incomplete calibration. Use Pause → Recalibrate to switch hands or move the camera. Settings lists available cameras after permission is granted; changing camera starts recalibration.
+Calibration takes just 3–5 seconds and requires no room-scale displacement. Prompts wait for valid observations rather than silently accepting incomplete calibration. Use Pause → Recalibrate to switch hands or move the camera. Settings lists available cameras after permission is granted; changing camera starts recalibration.
 
-## How to play
+## How to play: The Intent-Based Model
 
+- **Play from where you stand:** The player stays approximately in place. The virtual avatar automatically performs court traversal to intercept the incoming shuttle.
+- **Intent & Body Signals:** Small natural body motions influence avatar commitment:
+  - _Slight lean right / left:_ accelerates and commits the avatar to cover the right/left side of the court.
+  - _Forward reach / low preparation:_ indicates front-court drops and net coverage.
+  - _High preparation / raised racket:_ indicates rear-court clears and smashes.
 - **Serve:** make a deliberate, gentle upward arm swing. A new swing is needed for each player serve; no keyboard input is required.
-- **Move:** shift your torso or take a small sideways step. Calibration maps modest room movement across the virtual court.
-- **Reach:** raise/lower and extend your racket arm. The racket extends beyond the wrist along the forearm. The preview is mirrored like a mirror.
-- **Hit:** swing through the approaching shuttle near your racket. A real swing state and spatial proximity are both required. Merely holding your hand nearby does not hit.
-- **Shots:** upward strokes tend toward lifts/clears, horizontal strokes toward drives, slower deliberate strokes toward drops, and fast downward strokes from high contact toward smashes. Low or net-bound trajectories are assisted into safer returns. Incoming speed and early/late timing affect power and placement.
-- **Read the shuttle:** watch its shadow, trail, and Beginner landing ring. The ring predicts ground landing, not the exact interception point.
+- **Hit:** swing naturally through the approaching shuttle. The system uses a reachable contact envelope and forgiving timing window.
+- **Early swing priming:** a swing initiated slightly early stays primed for contact as the shuttle enters the valid envelope.
+- **Shot types:** upward strokes tend toward lifts/clears, horizontal strokes toward drives, slower deliberate strokes toward drops, and fast downward strokes from high contact toward smashes.
+- **Shot placement:** follow-through swing direction and torso intent bias outgoing shuttle placement left, center, or right.
+- **Auto-Recovery:** after returning a shot, the avatar smoothly recovers toward the central base position.
+- **Read the shuttle:** watch its shadow, trail, and Beginner landing ring.
 - **Score:** every rally awards one point. First to 21, win by two, capped at 30. The winner serves next. Pause/Escape pauses; results offers a new match.
 - **Tracking loss:** input becomes inactive after 240 ms, then the rally pauses after 800 ms. Stable tracking for about 650 ms resumes it. Switching tabs pauses the match.
 
-Start with Easy opponent and Beginner assistance. Normal reduces the contact radius and gives the AI a faster reaction/movement profile. Sensitivity changes swing thresholds relative to body size; movement sensitivity changes court mapping.
+Start with Easy opponent and Beginner assistance. Normal mode tightens the timing window and contact envelope and makes directional placement more influential, but never requires room-scale physical locomotion.
 
 ## Debug and diagnostics
 

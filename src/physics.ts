@@ -35,6 +35,73 @@ export function predict(s: Shuttle, max = 3) {
   }
   return points;
 }
+
+export type Interception = {
+  target: V3;
+  arrivalTime: number;
+  points: V3[];
+};
+
+export function predictInterception(
+  s: Shuttle,
+  isPlayer = true,
+  maxTime = 3.0,
+): Interception {
+  const points = predict(s, maxTime);
+  if (points.length === 0) {
+    return {
+      target: v(0, 1.4, isPlayer ? 4.0 : -3.9),
+      arrivalTime: 1.0,
+      points,
+    };
+  }
+
+  const dt = 1 / 60;
+  if (isPlayer) {
+    // Look for optimal player interception on positive Z half (court depth 1.8 to 5.6)
+    let bestIdx = -1;
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (p.z >= 1.6 && p.z <= 5.6 && p.y >= 0.4 && p.y <= 2.5) {
+        // Ideal contact band: z between 3.0 and 4.2, height ~ 1.2 to 2.0
+        if (p.z >= 2.8 && p.z <= 4.4 && p.y >= 0.8 && p.y <= 2.2) {
+          bestIdx = i;
+          break;
+        }
+        if (bestIdx === -1) bestIdx = i;
+      }
+    }
+    if (bestIdx === -1) {
+      // If dropping in front or behind, find the closest reasonable point in player court
+      bestIdx = points.findIndex((p) => p.z > 0.8 && p.y > 0.2);
+      if (bestIdx === -1) bestIdx = points.length - 1;
+    }
+    const target = points[bestIdx] ?? points[points.length - 1] ?? s.p;
+    return {
+      target: v(
+        clamp(target.x, -C.halfWidth + 0.2, C.halfWidth - 0.2),
+        clamp(target.y, 0.4, 2.5),
+        clamp(target.z, 1.8, 5.6),
+      ),
+      arrivalTime: (bestIdx + 1) * dt,
+      points,
+    };
+  } else {
+    // Opponent court (negative Z half)
+    let bestIdx = points.findIndex((p) => p.z < -1.0 && p.y < 1.8 && p.y > 0.4);
+    if (bestIdx === -1) bestIdx = points.length - 1;
+    const target = points[bestIdx] ?? s.p;
+    return {
+      target: v(
+        clamp(target.x, -2.4, 2.4),
+        clamp(target.y, 0.4, 2.2),
+        clamp(target.z, -6.0, -1.0),
+      ),
+      arrivalTime: (bestIdx + 1) * dt,
+      points,
+    };
+  }
+}
 /** Numerical shooting solver uses the same drag integrator as gameplay. */
 export function shotVelocity(
   start: V3,
