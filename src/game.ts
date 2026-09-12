@@ -10,6 +10,7 @@ import {
   type Shuttle,
 } from "./physics";
 import { neutralMotion, type Motion, type Intent } from "./motion";
+import { FlyOpponent } from "./flybrain/flyOpponent";
 
 export type GameEvent = {
   type: "hit" | "point" | "net" | "serve" | "swing";
@@ -51,6 +52,7 @@ export class OpponentAI {
 export class Game {
   match = new MatchManager();
   ai = new OpponentAI();
+  fly = new FlyOpponent();
   shuttle: Shuttle = {
     p: v(0.5, 1.3, 3.2),
     prev: v(0.5, 1.3, 3.2),
@@ -88,9 +90,22 @@ export class Game {
     this.motion = m;
   }
 
+  get opponentX(): number {
+    return this.settings.opponentType === "fruitfly" ? this.fly.x : this.ai.x;
+  }
+
+  get opponentY(): number {
+    return this.settings.opponentType === "fruitfly" ? this.fly.y : 1.4;
+  }
+
+  get opponentZ(): number {
+    return this.settings.opponentType === "fruitfly" ? this.fly.z : this.ai.z;
+  }
+
   reset() {
     this.match = new MatchManager();
     this.ai = new OpponentAI();
+    this.fly.reset();
     this.hits = 0;
     this.bestRally = 0;
     this.totalHits = 0;
@@ -109,6 +124,7 @@ export class Game {
     this.hits = 0;
     this.footworkState = "READY";
     this.targetPos = v(0, 0, C.playerBase.z);
+    this.fly.swingAttempted = false;
     this.lastShot =
       this.match.server === 0 ? "SWING TO SERVE" : "OPPONENT SERVING";
   }
@@ -201,6 +217,10 @@ export class Game {
     this.racket = mix(this.racket, targetRacket, 1 - Math.exp(-dt * 35));
 
     this.ai.update(dt, this.settings);
+    let flyMotor: any = null;
+    if (this.settings.opponentType === "fruitfly") {
+      flyMotor = this.fly.update(dt, this.shuttle, this.time, this.settings);
+    }
 
     if (this.state === "over") return;
 
@@ -214,10 +234,14 @@ export class Game {
 
     if (this.state === "ready") {
       const side = this.match.server;
+      const oppX =
+        this.settings.opponentType === "fruitfly" ? this.fly.x : this.ai.x;
+      const oppZ =
+        this.settings.opponentType === "fruitfly" ? this.fly.z : this.ai.z;
       this.shuttle.p =
         side === 0
           ? v(this.playerPos.x + 0.3, 1.15, this.playerPos.z - 0.85)
-          : v(this.ai.x, 1.15, this.ai.z);
+          : v(oppX, 1.15, oppZ);
       this.shuttle.prev = { ...this.shuttle.p };
 
       if (
@@ -315,23 +339,50 @@ export class Game {
     }
 
     // --- Opponent Return Logic ---
-    if (
-      s.lastHit === 0 &&
-      s.p.z < -0.6 &&
-      s.velocity.y < 0 &&
-      s.p.y < 2.1 &&
-      s.p.y > 0.3 &&
-      this.ai.state === "MOVE" &&
-      !this.ai.attempted &&
-      Math.hypot(s.p.x - this.ai.x, s.p.z - this.ai.z) < 1.1
-    ) {
-      this.ai.attempted = true;
-      this.ai.state = "SWING";
-      if (this.random() > C.ai[this.settings.difficulty].miss) {
-        const intents: Intent[] = ["clear", "drive", "drop", "lift"];
-        this.hit(1, intents[Math.floor(this.random() * intents.length)]);
+    if (this.settings.opponentType === "fruitfly") {
+      if (
+        s.lastHit === 0 &&
+        s.p.z < -0.5 &&
+        s.p.y < 2.8 &&
+        s.p.y > 0.25 &&
+        !this.fly.swingAttempted
+      ) {
+        const flyDist = Math.hypot(s.p.x - this.fly.x, s.p.z - this.fly.z);
+        if (
+          (flyMotor && flyMotor.swingTriggered) ||
+          (flyDist < 1.35 && s.velocity.y < 0)
+        ) {
+          this.fly.swingAttempted = true;
+          const hitIntent: Intent =
+            flyMotor?.swingType === "overhead"
+              ? "smash"
+              : flyMotor?.swingType === "lift"
+                ? "lift"
+                : flyMotor?.swingType === "backhand"
+                  ? "drive"
+                  : "clear";
+          this.hit(1, hitIntent);
+        }
       }
-      this.ai.state = "RECOVER";
+    } else {
+      if (
+        s.lastHit === 0 &&
+        s.p.z < -0.6 &&
+        s.velocity.y < 0 &&
+        s.p.y < 2.1 &&
+        s.p.y > 0.3 &&
+        this.ai.state === "MOVE" &&
+        !this.ai.attempted &&
+        Math.hypot(s.p.x - this.ai.x, s.p.z - this.ai.z) < 1.1
+      ) {
+        this.ai.attempted = true;
+        this.ai.state = "SWING";
+        if (this.random() > C.ai[this.settings.difficulty].miss) {
+          const intents: Intent[] = ["clear", "drive", "drop", "lift"];
+          this.hit(1, intents[Math.floor(this.random() * intents.length)]);
+        }
+        this.ai.state = "RECOVER";
+      }
     }
   }
 

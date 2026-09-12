@@ -41,6 +41,7 @@ export type Settings = {
   preview: boolean;
   debug: boolean;
   camera: string;
+  opponentType: "fruitfly" | "classic";
 };
 export const defaults: Settings = {
   sensitivity: 1,
@@ -51,6 +52,7 @@ export const defaults: Settings = {
   preview: true,
   debug: false,
   camera: "",
+  opponentType: "fruitfly",
 };
 export function readSettings(): Settings {
   try {

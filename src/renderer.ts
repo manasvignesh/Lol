@@ -227,6 +227,125 @@ export class CourtRenderer {
     );
     this.scene.add(line);
   }
+  flyOpponentGroup = new T.Group();
+  flyWings: T.Mesh[] = [];
+  flyWingPhase = 0;
+
+  makeFlyAvatar(group: T.Group) {
+    const bodyMat = new T.MeshStandardMaterial({
+      color: 0x4a2e18,
+      roughness: 0.4,
+      metalness: 0.2,
+    });
+    const stripeMat = new T.MeshStandardMaterial({
+      color: 0x241408,
+      roughness: 0.5,
+    });
+    const eyeMat = new T.MeshStandardMaterial({
+      color: 0xd63031,
+      emissive: 0x7a1111,
+      roughness: 0.2,
+      metalness: 0.5,
+    });
+    const wingMat = new T.MeshStandardMaterial({
+      color: 0xe0f7fa,
+      transparent: true,
+      opacity: 0.6,
+      roughness: 0.1,
+      metalness: 0.8,
+      side: T.DoubleSide,
+      depthWrite: false,
+    });
+
+    // 1. Thorax
+    const thorax = new T.Mesh(new T.SphereGeometry(0.28, 12, 10), bodyMat);
+    thorax.scale.set(1.0, 0.9, 1.25);
+    thorax.position.y = 0;
+    thorax.castShadow = true;
+    group.add(thorax);
+
+    // 2. Head & Compound Eyes
+    const head = new T.Mesh(new T.SphereGeometry(0.2, 10, 8), bodyMat);
+    head.position.set(0, 0.05, 0.35);
+    head.scale.set(1.1, 0.9, 0.85);
+    head.castShadow = true;
+    group.add(head);
+
+    // Compound Eyes (Left & Right)
+    for (const side of [-1, 1]) {
+      const eye = new T.Mesh(new T.SphereGeometry(0.12, 8, 6), eyeMat);
+      eye.position.set(side * 0.14, 0.08, 0.38);
+      eye.scale.set(0.9, 1.1, 1.0);
+      group.add(eye);
+    }
+
+    // 3. Abdomen (Segmented & Striped)
+    const abdomen = new T.Mesh(
+      new T.CapsuleGeometry(0.22, 0.45, 4, 10),
+      bodyMat,
+    );
+    abdomen.position.set(0, -0.05, -0.45);
+    abdomen.rotation.x = -0.3;
+    abdomen.castShadow = true;
+    group.add(abdomen);
+
+    // Abdomen stripes
+    for (let i = 0; i < 3; i++) {
+      const stripe = new T.Mesh(
+        new T.TorusGeometry(0.21 - i * 0.03, 0.025, 6, 16),
+        stripeMat,
+      );
+      stripe.position.set(0, -0.02 - i * 0.12, -0.32 - i * 0.12);
+      stripe.rotation.x = Math.PI / 2 - 0.3;
+      group.add(stripe);
+    }
+
+    // 4. Translucent Buzzing Wings
+    for (const side of [-1, 1]) {
+      const wingGeo = new T.PlaneGeometry(0.35, 0.85);
+      // Shift origin to wing hinge
+      wingGeo.translate(0, 0.4, 0);
+      const wing = new T.Mesh(wingGeo, wingMat);
+      wing.position.set(side * 0.15, 0.22, -0.05);
+      wing.rotation.x = Math.PI / 2 + 0.1;
+      wing.rotation.y = side * 0.35;
+      group.add(wing);
+      this.flyWings.push(wing);
+    }
+
+    // 5. Six Articulated Legs
+    const legMat = new T.MeshStandardMaterial({
+      color: 0x2b1b10,
+      roughness: 0.6,
+    });
+    for (let i = 0; i < 3; i++) {
+      for (const side of [-1, 1]) {
+        const leg = new T.Mesh(new T.CapsuleGeometry(0.02, 0.35, 2, 6), legMat);
+        leg.position.set(side * 0.26, -0.2 - i * 0.04, 0.15 - i * 0.25);
+        leg.rotation.z = side * 0.6;
+        leg.rotation.x = (i - 1) * 0.3;
+        leg.castShadow = true;
+        group.add(leg);
+      }
+    }
+
+    // 6. Ground Shadow / Reticle Ring
+    const reticle = new T.Mesh(
+      new T.RingGeometry(0.4, 0.46, 32),
+      new T.MeshBasicMaterial({
+        color: 0x45d0df,
+        transparent: true,
+        opacity: 0.7,
+        side: T.DoubleSide,
+      }),
+    );
+    reticle.rotation.x = -Math.PI / 2;
+    reticle.position.y = 0.04;
+    group.add(reticle);
+
+    group.scale.setScalar(1.6);
+  }
+
   makeAvatar(group: T.Group, color: number) {
     const mat = new T.MeshStandardMaterial({ color, roughness: 0.7 });
     const body = new T.Mesh(new T.CapsuleGeometry(0.23, 0.45, 4, 12), mat);
@@ -257,20 +376,32 @@ export class CourtRenderer {
     ring.position.y = 0.04;
     group.add(ring);
   }
+
   resize(container: HTMLElement) {
     const { width, height } = container.getBoundingClientRect();
     this.renderer.setSize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
   }
+
   impact(p: V3, power = 0) {
     this.flash.position.set(p.x, p.y, p.z);
     this.flashLife = 0.22;
     this.cameraShake = power > 85 ? 0.07 : 0;
   }
+
   render(game: Game, dt: number) {
+    // Ensure fly opponent group is in scene
+    if (!this.flyOpponentGroup.parent) {
+      this.makeFlyAvatar(this.flyOpponentGroup);
+      this.scene.add(this.flyOpponentGroup);
+    }
+
+    const isFly = game.settings.opponentType === "fruitfly";
+    this.opponent.visible = !isFly;
+    this.flyOpponentGroup.visible = isFly;
+
     this.player.position.set(game.playerPos.x, 0, game.playerPos.z);
-    this.opponent.position.set(game.ai.x, 0, game.ai.z);
     const lateralVelocity = game.targetPos.x - game.playerPos.x;
     this.player.rotation.z = clamp(
       -lateralVelocity * 0.12 + game.motion.lean * 0.2,
@@ -295,22 +426,66 @@ export class CourtRenderer {
     elbow.z += 0.15;
     this.connectArm(this.armSegments[0], shoulder, elbow);
     this.connectArm(this.armSegments[1], elbow, hand);
-    const swing =
-      game.shuttle.lastHit === 1 && game.time - game.lastContact < 0.3;
-    this.opponentRacket.position.set(
-      game.ai.x + (swing ? -0.25 : 0.55),
-      swing ? 1.8 : 1.25,
-      game.ai.z + 0.35,
-    );
-    this.opponentRacket.rotation.z = swing ? -0.9 : 0.4;
-    const aiHand = new T.Vector3(0, -0.55, 0)
-      .applyQuaternion(this.opponentRacket.quaternion)
-      .add(this.opponentRacket.position);
-    const aiShoulder = new T.Vector3(game.ai.x + 0.2, 1.3, game.ai.z);
-    const aiElbow = aiShoulder.clone().lerp(aiHand, 0.5);
-    aiElbow.y -= 0.13;
-    this.connectArm(this.armSegments[2], aiShoulder, aiElbow);
-    this.connectArm(this.armSegments[3], aiElbow, aiHand);
+
+    // Render opponent according to active type
+    if (isFly) {
+      this.flyOpponentGroup.position.set(game.fly.x, game.fly.y, game.fly.z);
+      this.flyOpponentGroup.rotation.y = Math.PI + game.fly.heading;
+      // Banking in turns
+      this.flyOpponentGroup.rotation.z = clamp(
+        -game.fly.lastMotorCommand.vx * 0.18,
+        -0.4,
+        0.4,
+      );
+      this.flyOpponentGroup.rotation.x = clamp(
+        -game.fly.lastMotorCommand.vz * 0.12,
+        -0.25,
+        0.25,
+      );
+
+      // Wing flapping oscillation modulated by arousal
+      const arousal = game.fly.lastMotorCommand.arousal;
+      this.flyWingPhase += dt * (35 + arousal * 65);
+      if (this.flyWings.length >= 2) {
+        const flap = Math.sin(this.flyWingPhase) * (0.4 + arousal * 0.35);
+        this.flyWings[0].rotation.z = flap;
+        this.flyWings[1].rotation.z = -flap;
+      }
+
+      // Fly Racket Position
+      this.opponentRacket.position.set(
+        game.fly.racketPos.x,
+        game.fly.racketPos.y,
+        game.fly.racketPos.z,
+      );
+      this.opponentRacket.rotation.z = game.fly.racketRotationZ;
+
+      // Hide humanoid opponent arm segments
+      this.armSegments[2].visible = false;
+      this.armSegments[3].visible = false;
+    } else {
+      this.opponent.position.set(game.ai.x, 0, game.ai.z);
+      this.armSegments[2].visible = true;
+      this.armSegments[3].visible = true;
+
+      const swing =
+        game.shuttle.lastHit === 1 && game.time - game.lastContact < 0.3;
+      this.opponentRacket.position.set(
+        game.ai.x + (swing ? -0.25 : 0.55),
+        swing ? 1.8 : 1.25,
+        game.ai.z + 0.35,
+      );
+      this.opponentRacket.rotation.z = swing ? -0.9 : 0.4;
+      const aiHand = new T.Vector3(0, -0.55, 0)
+        .applyQuaternion(this.opponentRacket.quaternion)
+        .add(this.opponentRacket.position);
+      const aiShoulder = new T.Vector3(game.ai.x + 0.2, 1.3, game.ai.z);
+      const aiElbow = aiShoulder.clone().lerp(aiHand, 0.5);
+      aiElbow.y -= 0.13;
+      this.connectArm(this.armSegments[2], aiShoulder, aiElbow);
+      this.connectArm(this.armSegments[3], aiElbow, aiHand);
+    }
+
     this.shuttle.position.set(
       game.shuttle.p.x,
       game.shuttle.p.y,
@@ -355,6 +530,7 @@ export class CourtRenderer {
     this.cameraShake *= 0.85;
     this.renderer.render(this.scene, this.camera);
   }
+
   connectArm(mesh: T.Mesh, a: T.Vector3, b: T.Vector3) {
     const direction = b.clone().sub(a);
     mesh.position.copy(a).lerp(b, 0.5);

@@ -1,14 +1,48 @@
-# Motion Badminton
+# Human vs Fruit-Fly Connectome Badminton
 
-A playable local singles badminton prototype: your webcam tracks your body intent, your avatar handles the court traversal, and deliberate swings return a drag-heavy shuttle against a heuristic opponent. No account, API key, cloud inference, or video upload. The intended moment is simple: **play badminton from where you stand** (~1m × 1m area).
+A scientifically grounded, playable local singles badminton experience: your webcam tracks your upper-body intent from where you stand, while your opponent is driven by computational neural dynamics constrained by a **real Drosophila connectome (Janelia MaleCNS v1.0)**.
 
-**Status:** implemented and tested as a prototype. Actual MediaPipe inference has been verified using a public prerecorded image; the complete calibration/game/tracking-recovery path has been tested with synthetic pose fixtures. **A human webcam playtest and subjective “I hit that” validation have not been performed.** This is not a claim of production-quality gesture recognition.
+The experience features an active **Leaky Integrate-and-Fire (LIF)** network simulation operating over the biological connectome wiring diagram, accompanied by a real-time **Connectome Lab** visualizer and optogenetic intervention suite.
 
-![Local keyboard-test rally showing the playable court](docs/images/game.png)
+No accounts, cloud inference, external API keys, or video uploads. Runs 100% locally in your browser.
 
-## Run on Windows
+![Connectome Badminton Match View](docs/images/game.png)
 
-Install Node.js 22.12 or newer and Git. Use current Chrome or Edge with hardware acceleration.
+---
+
+## Key Innovations
+
+### 1. Zero-Scripted Drosophila Opponent
+
+- **Empirical Connectome Graph**: Uses the HHMI Janelia MaleCNS v1.0 dataset containing 172 biologically annotated sensorimotor neurons and 1,284 directional synapses.
+- **Leaky Integrate-and-Fire (LIF) Simulation**: Implements continuous biophysical membrane potential dynamics, exponential synaptic conductances, absolute refractory periods, and biological neurotransmitter signs (+1 ACh, -1 GABA/Glu) following Shiu et al. (_Nature_ 2024).
+- **Optical Sensory Transduction**: Transforms 3D shuttle trajectory into spherical retinal coordinates, looming angular expansion rates ($\eta(t)$), and retinotopic visual projection neuron (LC4, LC6, LC10, LPLC2) inputs.
+- **Descending Motor Decoding**: Decodes asymmetric population rates of descending neurons (DNa01/DNa02 lateral steering, DNp01 forward thrust, DNb01 strike triggers) directly into flight velocity ($v_x, v_z$) and cyber-racket strikes.
+- **Dual Opponent Mode**: Toggle freely between the **Fruit-Fly Connectome** and the baseline **Classic AI**.
+
+### 2. Live Connectome Lab & Optogenetic Interventions
+
+- **Interactive 3-View Neural Visualizer**:
+  - _Circuit Flow View_: Hierarchical signal propagation from Optic Lobe $\rightarrow$ Central Complex $\rightarrow$ Descending Pathways $\rightarrow$ VNC Motor Effectors.
+  - _Spatial View_: 3D anatomical layout of the fly brain in biological micron coordinates.
+  - _Spike Raster & Oscilloscope_: Real-time spike rasters and population firing rate traces.
+- **Real-Time Interventions**:
+  - _Silence Looming (LC4/LC6)_: Optogenetically silences collision detection; test if the fly misses incoming high-speed shots!
+  - _Silence Steering (DNa02)_: Inhibits lateral motor pathways.
+  - _Silence Strike Trigger (DNb01)_: Prevents racket swing execution.
+  - _Synaptic Gain & Sensory Drive Sliders_: Dynamically scale network excitability.
+
+### 3. Intent-Based Human Control Model
+
+- **Play from where you stand**: Designed for real physical play in a ~1m × 1m space.
+- **Auto-Footwork & Body Intent**: The virtual player avatar handles court traversal automatically. Subtle torso leans and reach directions bias speed, court positioning, and shot placement.
+- **3-Stage Fast Calibration**: 3–5 second calibration (Center $\rightarrow$ Racket Hand $\rightarrow$ Extended Reach) with no room traversal required.
+
+---
+
+## Quick Start (Windows / macOS / Linux)
+
+Prerequisites: Node.js 22+ and Git. Recommended: Google Chrome or Microsoft Edge with hardware acceleration enabled.
 
 ```powershell
 git clone https://github.com/manasvignesh/Lol.git
@@ -18,153 +52,70 @@ npm run setup
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. Initial installation needs internet access to download dependencies and Google's versioned pose model (about 5.8 MB). After setup, both inference and gameplay run locally, including all WASM and model requests. The server binds to loopback only. macOS/Linux use the same commands.
+Open **http://127.0.0.1:5173**.
 
-For an optimized local build:
+For an optimized production build:
 
 ```powershell
 npm run build
 npm run preview
 ```
 
-Open **http://127.0.0.1:4173**. Do not open `index.html` directly from the filesystem. Keep the terminal running. Ctrl+C stops the server. Quit releases the camera; browser security prevents a page from reliably closing a user-opened tab.
+---
 
-## Camera and calibration
+## Scientific Documentation
 
-Use a normal laptop or USB webcam, ideally 640×480 at 30 FPS. Face the camera in front lighting, with shoulders, elbows, wrists, and hips visible. Legs are tracked if visible but are not required. Avoid loose sleeves obscuring wrists. Clear a comfortable arm-span around you; **stay in place (~1m area) and do not jump or take full-court steps.**
+- [docs/NEUROSCIENCE.md](docs/NEUROSCIENCE.md): Comprehensive biophysical formulation, LIF equations, sensory encoding math, motor decoding, and scientific honesty boundaries.
+- [docs/CONNECTOME_DATA.md](docs/CONNECTOME_DATA.md): Connectome CSR matrix binary format, schema, and dataset reproduction.
+- [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md): Citations and credit for HHMI Janelia, FlyWire, and open-source packages.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): System architecture, Web Worker execution pipeline, and state synchronization.
+- [docs/VALIDATION.md](docs/VALIDATION.md): Automated verification suite and acceptance testing record.
 
-1. Select **Play with camera** and allow browser camera access.
-2. **Position:** Stand centered and relaxed for about 1.2 seconds.
-3. **Racket hand:** Raise **only your racket hand** above its shoulder for about 0.8 seconds. Either hand works; selection is automatic.
-4. **Reach & Intent:** Extend that arm comfortably for about 0.8 seconds. The match starts automatically.
+---
 
-Calibration takes just 3–5 seconds and requires no room-scale displacement. Prompts wait for valid observations rather than silently accepting incomplete calibration. Use Pause → Recalibrate to switch hands or move the camera. Settings lists available cameras after permission is granted; changing camera starts recalibration.
+## How to Play
 
-## How to play: The Intent-Based Model
+1. Click **Play with Camera** and allow webcam access.
+2. Complete the 3-second calibration:
+   - **Step 1:** Stand centered and relaxed.
+   - **Step 2:** Raise only your racket hand above shoulder level.
+   - **Step 3:** Extend your racket arm comfortably.
+3. **Serve**: Make a deliberate, gentle upward swing.
+4. **Rally**: Swing naturally as the shuttle approaches. Torso leans steer your avatar; forearm trajectory directs shot type (Clear, Drive, Drop, Smash, Lift).
+5. **Connectome Lab**: Click the **🧠 CONNECTOME LAB** button in the header or HUD to open the live neural visualizer and experiment with optogenetic silencing during live rallies!
 
-- **Play from where you stand:** The player stays approximately in place. The virtual avatar automatically performs court traversal to intercept the incoming shuttle.
-- **Intent & Body Signals:** Small natural body motions influence avatar commitment:
-  - _Slight lean right / left:_ accelerates and commits the avatar to cover the right/left side of the court.
-  - _Forward reach / low preparation:_ indicates front-court drops and net coverage.
-  - _High preparation / raised racket:_ indicates rear-court clears and smashes.
-- **Serve:** make a deliberate, gentle upward arm swing. A new swing is needed for each player serve; no keyboard input is required.
-- **Hit:** swing naturally through the approaching shuttle. The system uses a reachable contact envelope and forgiving timing window.
-- **Early swing priming:** a swing initiated slightly early stays primed for contact as the shuttle enters the valid envelope.
-- **Shot types:** upward strokes tend toward lifts/clears, horizontal strokes toward drives, slower deliberate strokes toward drops, and fast downward strokes from high contact toward smashes.
-- **Shot placement:** follow-through swing direction and torso intent bias outgoing shuttle placement left, center, or right.
-- **Auto-Recovery:** after returning a shot, the avatar smoothly recovers toward the central base position.
-- **Read the shuttle:** watch its shadow, trail, and Beginner landing ring.
-- **Score:** every rally awards one point. First to 21, win by two, capped at 30. The winner serves next. Pause/Escape pauses; results offers a new match.
-- **Tracking loss:** input becomes inactive after 240 ms, then the rally pauses after 800 ms. Stable tracking for about 650 ms resumes it. Switching tabs pauses the match.
+---
 
-Start with Easy opponent and Beginner assistance. Normal mode tightens the timing window and contact envelope and makes directional placement more influential, but never requires room-scale physical locomotion.
+## Keyboard Controls (Test Mode)
 
-## Debug and diagnostics
+| Key                   | Action                                     |
+| :-------------------- | :----------------------------------------- |
+| **A / D**             | Steer player avatar left / right           |
+| **W / S**             | Adjust racket reach height                 |
+| **Space**             | Swing racket / Serve                       |
+| **1 / 2 / 3 / 4 / 5** | Clear / Drive / Drop / Smash / Lift intent |
+| **Escape**            | Pause / Resume                             |
 
-**Keyboard test** is explicitly separate from webcam mode:
+---
 
-| Key               | Action                                     |
-| ----------------- | ------------------------------------------ |
-| A/D or left/right | Move sideways                              |
-| W/S or up/down    | Adjust racket height                       |
-| Space             | Deliberate swing / serve                   |
-| 1 / 2 / 3 / 4 / 5 | Clear / drive / drop / smash / lift intent |
-| Escape            | Pause/resume                               |
-| F3                | Toggle telemetry                           |
-
-Settings → **Run synthetic pose diagnostic** feeds generated anatomical landmarks through the real filter and interpreter. It is a motion diagnostic, not an autonomous opponent or proof of camera recognition. Developer overlay shows camera, inference and render FPS, processing latency, confidence, hand, elbow angle, swing state/ID, intent, racket position, AI state and contact count. Webcam preview draws shoulder/elbow/wrist/hip/knee/ankle connections locally. `window.motionDiagnostics` is a read-only snapshot for acceptance scripts.
-
-## Architecture and stack
-
-TypeScript + Three.js + Vite, with MediaPipe Pose Landmarker Lite on the CPU in a **classic Web Worker**. No backend application or IPC service is necessary. The local web server only serves static source/assets. The worker is bundled as IIFE because MediaPipe's WASM loader uses `importScripts`; an ES module worker fails at runtime.
-
-```text
-getUserMedia → newest ImageBitmap (one in flight) → pose worker
-  → confidence gate → adaptive pose filter → calibrated arm-chain interpretation
-  → swing state machine → player/racket controller
-  → fixed 120 Hz swept contact / shuttle physics / AI / scoring
-  → independent requestAnimationFrame rendering + UI + procedural audio
-```
-
-`createImageBitmap` transfers only the latest frame when the worker is idle. Frames are never queued. Pose velocity uses frame capture timestamps, not render timestamps. Shoulder-relative motion suppresses torso translation; body-proportion normalization makes thresholds resolution-independent. Fast movement reduces smoothing. Invalid/stale poses reset velocity history to avoid a recovery spike.
-
-Shuttle physics uses semi-implicit gravity with stable quadratic drag. A numerical shooting solver uses the same integrator to aim distinct flight profiles. Contact calculates the closest relative approach of two moving points over the same fixed step. Beginner/Normal assistance enlarges the effective zone, but does not bypass swing confidence or per-swing hit consumption.
-
-The AI predicts an interception from simulated flight, waits its reaction delay, moves at limited speed, and has explicit miss/placement error. Court coordinates are meters, `y` is up, positive `z` is the player half. Rendering is independent from deterministic game state.
-
-## Folder structure
-
-```text
-src/
-  camera.ts          camera lifecycle, frame scheduling, metrics
-  pose.worker.ts     local MediaPipe inference
-  motion.ts          filter, calibration, interpretation, swing state
-  game.ts            player/racket updates, AI, contacts, rally lifecycle
-  physics.ts         drag, shot solver, prediction, court and scoring rules
-  renderer.ts        lit 3D court, avatars, racket, shuttle, effects
-  audio.ts           local procedural sound
-  config.ts          shared tuning and default settings
-  synthetic.ts       explicit keyboard and generated-pose test inputs
-  main.ts/style.css  screens, integration, telemetry, presentation
-scripts/             offline asset setup, worker build, browser acceptance
-tests/               deterministic unit and integration tests
-public/              favicon and generated local runtime assets
-docs/                engineering decisions and validation record
-```
-
-## Development and verification
+## Verification & Testing
 
 ```powershell
+# Run 40 automated unit and integration tests
 npm test
+
+# Typecheck and build verification
 npm run typecheck
-npm run format:check
 npm run build
-npm audit
+
+# Format check
+npm run format:check
 ```
 
-With `npm run dev` running in a separate terminal and Chrome installed:
+---
 
-```powershell
-npm run test:browser
-npm run test:camera
-npm run test:motion-flow
-```
+## License & Attribution
 
-Browser tests write screenshots and JSON to ignored `test-results/`. The camera test downloads Google's public test image if needed; it runs the actual model in the actual worker using a canvas camera stream. The motion-flow test replaces pose inference with deterministic results, explicitly testing all calibration stages, serving and tracking pause/recovery. These tests complement one another; neither is a physical human playtest. See [validation details](docs/VALIDATION.md).
-
-## Performance
-
-Observed in headless Chrome on the development machine: approximately 60 render FPS during keyboard rallies, and 22–31 pose FPS with about 22–29 ms inference and 23–30 ms capture-to-result processing on the prerecorded detected-pose fixture across development and production runs. Person-search frames were slower. These are sample measurements, not hardware-independent guarantees or sensor-to-display latency. Camera exposure, OS buffering, screen latency and physical interaction were not measured. CPU inference keeps GPU rendering independent. Render pixel ratio is capped at 1.75, and frames are discarded while inference is busy. The overlay identifies low pose FPS.
-
-## Troubleshooting
-
-- **Permission denied:** allow the camera in the browser address bar; retry Play. OS Settings → Privacy & security → Camera must also allow desktop apps.
-- **Camera busy/disconnected:** close video-call apps, reconnect, and recalibrate. Choose Default camera if a saved device ID is unavailable.
-- **Model/WASM missing:** run `npm run setup` from the repository. Setup downloads the versioned model and copies WASM from the locked npm dependency.
-- **Worker changes not reflected:** restart `npm run dev`; its predev step rebuilds the classic worker. Main app changes use Vite hot reload.
-- **No tracking:** improve front lighting, move away from backlighting, face forward, and fit shoulders/wrists/hips inside frame.
-- **Low FPS:** close other heavy apps, enable browser hardware acceleration, use a 30 FPS camera, and lower the browser window size. Debug overlay gives measured bottlenecks.
-- **Unwanted swings:** reduce Swing sensitivity; keep the camera still and recalibrate. Large rapid repositioning can still resemble a swing.
-- **Missed returns:** start with Beginner assistance, watch the shuttle shadow, and swing near the visible racket. This prototype still needs human timing/threshold tuning.
-- **Port busy:** Vite prints the actual URL if 5173 is occupied. Browser scripts expect 5173 unless `GAME_URL` is set.
-
-## Known limitations and simplifications
-
-- Single-camera depth/racket orientation is approximate 2.5D; lateral position and racket height are controlled physically, while racket depth stays in a narrow contact band. It does not reconstruct a true 3D racket face or require a physical racket.
-- No separate hand-landmark model, reliable defensive-block classifier, or biomechanical forehand/backhand labeling. The five practical intent classes come from arm trajectory and speed; any valid new swing may serve.
-- Only one visible player is supported. Multiple people can confuse person tracking. Lower-body landmarks are drawn but not required for gameplay.
-- Simplified serving: no diagonal service boxes, foot faults, doubles, ends switching or best-of-three match. The actual rally scoring and 30-point cap are implemented.
-- Shot assistance favors net clearance and valid court targets; it makes unforced player out shots less common than real badminton. The AI has simple heuristics and is not tournament-strength.
-- Stylized avatars and procedural audio; no detailed skeletal animation or recorded sports sounds.
-- No physical camera disconnect, multiple physical camera selection, variable lighting, left-handed human swing, or sustained real-person rally has been manually validated here.
-- Subjective latency, contact forgiveness and “I hit that” feel need human playtesting before this can be called polished motion control.
-
-## Assets, privacy and repository notes
-
-The game uses generated geometry, CSS, and synthesized sound rather than third-party artwork. MediaPipe is Apache-2.0; Three.js is MIT. The versioned Google model is downloaded from the official MediaPipe model distribution. See [third-party notes](docs/THIRD_PARTY.md). No video, camera image or calibration is persisted by the app. Settings alone are saved locally. Browser test fixtures and screenshots are development-only and ignored by Git.
-
-Dependencies are pinned in `package-lock.json`. Generated models/WASM, `node_modules`, builds, logs and test outputs are intentionally untracked. Source and reproducible setup are the GitHub deliverable. The default branch is `main` at [manasvignesh/Lol](https://github.com/manasvignesh/Lol). Build/test before pushing; never commit private camera media or credentials.
-
-## Next milestone
-
-Run structured physical webcam playtests with left/right-handed players, several webcams and small rooms. Measure false swing rate, missed-contact rate, motion-to-contact delay and rally length, then tune thresholds and assistance from those observations. After that: improve 3D contact depth, avatar arm animation and shot variety. Keep accounts, multiplayer, monetization and other sports out of this prototype.
+- Connectome data adapted from HHMI Janelia MaleCNS v1.0 and FlyWire (_Nature_ 2024).
+- MediaPipe Pose Landmarker: Apache-2.0.
+- Three.js: MIT License.

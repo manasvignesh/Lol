@@ -566,6 +566,177 @@ label.check {
   letter-spacing: 8px;
   margin: 20px 0;
 }
+@media (max-width: 640px) {
+  body {
+    overflow-y: auto;
+  }
+}
+
+/* --- Fruit-Fly Connectome Lab & Brain Panel --- */
+.brain-nav-btn {
+  background: rgba(22, 45, 52, 0.85);
+  border: 1px solid rgba(69, 208, 223, 0.4);
+  color: #45d0df;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brain-nav-btn:hover {
+  background: rgba(69, 208, 223, 0.15);
+  border-color: #45d0df;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(69, 208, 223, 0.35);
+}
+#brain-panel {
+  position: fixed;
+  right: 24px;
+  top: 80px;
+  bottom: 24px;
+  width: 440px;
+  max-width: calc(100vw - 48px);
+  background: rgba(9, 19, 24, 0.94);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(69, 208, 223, 0.3);
+  border-radius: 18px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  overflow: hidden;
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease;
+}
+#brain-panel.hidden {
+  transform: translateX(480px);
+  opacity: 0;
+  pointer-events: none;
+}
+.brain-header {
+  padding: 16px 20px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.brain-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #45d0df;
+  display: block;
+  margin-bottom: 2px;
+}
+.brain-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #e6f1eb;
+}
+.brain-view-tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.brain-view-tabs button {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a2b9be;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+.brain-view-tabs button.active {
+  background: rgba(69, 208, 223, 0.25);
+  border-color: #45d0df;
+  color: #ffffff;
+}
+#btn-brain-close {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: #8fa5aa;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+#btn-brain-close:hover {
+  color: #ffffff;
+}
+#brain-viewport {
+  flex: 1;
+  min-height: 240px;
+  position: relative;
+  background: #081216;
+}
+.neural-lab-controls {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 14, 18, 0.8);
+}
+.lab-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.lab-title span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #8ba5aa;
+}
+.lab-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.lab-toggle {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a2b9be;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 6px 4px;
+  border-radius: 6px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.lab-toggle.silenced {
+  background: rgba(255, 94, 126, 0.2);
+  border-color: #ff5e7e;
+  color: #ff5e7e;
+}
+.lab-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lab-sliders label {
+  font-size: 11px;
+  color: #a2b9be;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lab-sliders span {
+  font-family: monospace;
+  color: #45d0df;
+}
+.lab-sliders input[type="range"] {
+  flex: 1;
+  max-width: 140px;
+}
 @media (max-height: 780px) {
   .panel {
     top: 15%;

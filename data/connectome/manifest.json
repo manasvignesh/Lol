@@ -1,0 +1,44 @@
+{
+  "name": "Drosophila MaleCNS Sensorimotor Subcircuit v1.0",
+  "version": "1.0.0",
+  "source": "Janelia MaleCNS v1.0 / Shiu et al. Nature 2024 / FlyWire",
+  "neuronCount": 172,
+  "synapseCount": 1284,
+  "regions": {
+    "OpticLobe": 48,
+    "CentralComplex": 68,
+    "Protocerebrum": 24,
+    "Descending": 26,
+    "VNC": 6
+  },
+  "keyPathways": {
+    "loomingVPNs": [
+      "LC4",
+      "LC6",
+      "LPLC2"
+    ],
+    "targetAzimuthVPNs": [
+      "LC10"
+    ],
+    "compassIntegrators": [
+      "EPG",
+      "P-EN",
+      "P-FN"
+    ],
+    "steeringDescending": [
+      "DNa01",
+      "DNa02"
+    ],
+    "forwardThrustDescending": [
+      "DNp01"
+    ],
+    "strikeDescending": [
+      "DNb01",
+      "GiantFiber"
+    ],
+    "brakingDescending": [
+      "MDN"
+    ]
+  },
+  "createdAt": "2026-09-12T20:49:44.690Z"
+}

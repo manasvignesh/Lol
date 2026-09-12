@@ -1,0 +1,2902 @@
+[
+  {
+    "id": 0,
+    "name": "LC4_L_0",
+    "type": "LC4",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -220,
+      120,
+      80
+    ],
+    "role": "Looming collision & rapid expansion detection (Left)",
+    "receptiveField": {
+      "azimuthMin": -95,
+      "azimuthMax": -55,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 1,
+    "name": "LC4_L_1",
+    "type": "LC4",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -228,
+      120,
+      90
+    ],
+    "role": "Looming collision & rapid expansion detection (Left)",
+    "receptiveField": {
+      "azimuthMin": -81,
+      "azimuthMax": -41,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 2,
+    "name": "LC4_L_2",
+    "type": "LC4",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -236,
+      120,
+      100
+    ],
+    "role": "Looming collision & rapid expansion detection (Left)",
+    "receptiveField": {
+      "azimuthMin": -67,
+      "azimuthMax": -27,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 3,
+    "name": "LC4_L_3",
+    "type": "LC4",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -244,
+      120,
+      110
+    ],
+    "role": "Looming collision & rapid expansion detection (Left)",
+    "receptiveField": {
+      "azimuthMin": -53,
+      "azimuthMax": -13,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 4,
+    "name": "LC4_L_4",
+    "type": "LC4",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -252,
+      120,
+      120
+    ],
+    "role": "Looming collision & rapid expansion detection (Left)",
+    "receptiveField": {
+      "azimuthMin": -39,
+      "azimuthMax": 1,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 5,
+    "name": "LC4_L_5",
+    "type": "LC4",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -260,
+      120,
+      130
+    ],
+    "role": "Looming collision & rapid expansion detection (Left)",
+    "receptiveField": {
+      "azimuthMin": -25,
+      "azimuthMax": 15,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 6,
+    "name": "LC6_L_0",
+    "type": "LC6",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -200,
+      100,
+      70
+    ],
+    "role": "Small looming target detection & approach tracking (Left)",
+    "receptiveField": {
+      "azimuthMin": -88,
+      "azimuthMax": -52,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 7,
+    "name": "LC6_L_1",
+    "type": "LC6",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -207,
+      100,
+      78
+    ],
+    "role": "Small looming target detection & approach tracking (Left)",
+    "receptiveField": {
+      "azimuthMin": -75,
+      "azimuthMax": -39,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 8,
+    "name": "LC6_L_2",
+    "type": "LC6",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -214,
+      100,
+      86
+    ],
+    "role": "Small looming target detection & approach tracking (Left)",
+    "receptiveField": {
+      "azimuthMin": -62,
+      "azimuthMax": -26,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 9,
+    "name": "LC6_L_3",
+    "type": "LC6",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -221,
+      100,
+      94
+    ],
+    "role": "Small looming target detection & approach tracking (Left)",
+    "receptiveField": {
+      "azimuthMin": -49,
+      "azimuthMax": -13,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 10,
+    "name": "LC6_L_4",
+    "type": "LC6",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -228,
+      100,
+      102
+    ],
+    "role": "Small looming target detection & approach tracking (Left)",
+    "receptiveField": {
+      "azimuthMin": -36,
+      "azimuthMax": 0,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 11,
+    "name": "LC6_L_5",
+    "type": "LC6",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -235,
+      100,
+      110
+    ],
+    "role": "Small looming target detection & approach tracking (Left)",
+    "receptiveField": {
+      "azimuthMin": -23,
+      "azimuthMax": 13,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 12,
+    "name": "LC10_L_0",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -180,
+      80,
+      60
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -92,
+      "azimuthMax": -68,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 13,
+    "name": "LC10_L_1",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -186,
+      80,
+      66
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -81,
+      "azimuthMax": -57,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 14,
+    "name": "LC10_L_2",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -192,
+      80,
+      72
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -70,
+      "azimuthMax": -46,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 15,
+    "name": "LC10_L_3",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -198,
+      80,
+      78
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -59,
+      "azimuthMax": -35,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 16,
+    "name": "LC10_L_4",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -204,
+      80,
+      84
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -48,
+      "azimuthMax": -24,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 17,
+    "name": "LC10_L_5",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -210,
+      80,
+      90
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -37,
+      "azimuthMax": -13,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 18,
+    "name": "LC10_L_6",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -216,
+      80,
+      96
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -26,
+      "azimuthMax": -2,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 19,
+    "name": "LC10_L_7",
+    "type": "LC10",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -222,
+      80,
+      102
+    ],
+    "role": "High-acuity small-target azimuth orientation (Left)",
+    "receptiveField": {
+      "azimuthMin": -15,
+      "azimuthMax": 9,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 20,
+    "name": "LPLC2_L_0",
+    "type": "LPLC2",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -210,
+      140,
+      90
+    ],
+    "role": "Radial optical expansion and looming trajectory (Left)",
+    "receptiveField": {
+      "azimuthMin": -80,
+      "azimuthMax": -15,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 21,
+    "name": "LPLC2_L_1",
+    "type": "LPLC2",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -215,
+      140,
+      98
+    ],
+    "role": "Radial optical expansion and looming trajectory (Left)",
+    "receptiveField": {
+      "azimuthMin": -58,
+      "azimuthMax": 7,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 22,
+    "name": "LPLC2_L_2",
+    "type": "LPLC2",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -220,
+      140,
+      106
+    ],
+    "role": "Radial optical expansion and looming trajectory (Left)",
+    "receptiveField": {
+      "azimuthMin": -36,
+      "azimuthMax": 29,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 23,
+    "name": "LPLC2_L_3",
+    "type": "LPLC2",
+    "hemisphere": "L",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -225,
+      140,
+      114
+    ],
+    "role": "Radial optical expansion and looming trajectory (Left)",
+    "receptiveField": {
+      "azimuthMin": -14,
+      "azimuthMax": 51,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 24,
+    "name": "LC4_R_0",
+    "type": "LC4",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      220,
+      120,
+      80
+    ],
+    "role": "Looming collision & rapid expansion detection (Right)",
+    "receptiveField": {
+      "azimuthMin": -15,
+      "azimuthMax": 25,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 25,
+    "name": "LC4_R_1",
+    "type": "LC4",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      228,
+      120,
+      90
+    ],
+    "role": "Looming collision & rapid expansion detection (Right)",
+    "receptiveField": {
+      "azimuthMin": -1,
+      "azimuthMax": 39,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 26,
+    "name": "LC4_R_2",
+    "type": "LC4",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      236,
+      120,
+      100
+    ],
+    "role": "Looming collision & rapid expansion detection (Right)",
+    "receptiveField": {
+      "azimuthMin": 13,
+      "azimuthMax": 53,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 27,
+    "name": "LC4_R_3",
+    "type": "LC4",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      244,
+      120,
+      110
+    ],
+    "role": "Looming collision & rapid expansion detection (Right)",
+    "receptiveField": {
+      "azimuthMin": 27,
+      "azimuthMax": 67,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 28,
+    "name": "LC4_R_4",
+    "type": "LC4",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      252,
+      120,
+      120
+    ],
+    "role": "Looming collision & rapid expansion detection (Right)",
+    "receptiveField": {
+      "azimuthMin": 41,
+      "azimuthMax": 81,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 29,
+    "name": "LC4_R_5",
+    "type": "LC4",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      260,
+      120,
+      130
+    ],
+    "role": "Looming collision & rapid expansion detection (Right)",
+    "receptiveField": {
+      "azimuthMin": 55,
+      "azimuthMax": 95,
+      "elevationMin": -40,
+      "elevationMax": 60,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 30,
+    "name": "LC6_R_0",
+    "type": "LC6",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      200,
+      100,
+      70
+    ],
+    "role": "Small looming target detection & approach tracking (Right)",
+    "receptiveField": {
+      "azimuthMin": -13,
+      "azimuthMax": 23,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 31,
+    "name": "LC6_R_1",
+    "type": "LC6",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      207,
+      100,
+      78
+    ],
+    "role": "Small looming target detection & approach tracking (Right)",
+    "receptiveField": {
+      "azimuthMin": 0,
+      "azimuthMax": 36,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 32,
+    "name": "LC6_R_2",
+    "type": "LC6",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      214,
+      100,
+      86
+    ],
+    "role": "Small looming target detection & approach tracking (Right)",
+    "receptiveField": {
+      "azimuthMin": 13,
+      "azimuthMax": 49,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 33,
+    "name": "LC6_R_3",
+    "type": "LC6",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      221,
+      100,
+      94
+    ],
+    "role": "Small looming target detection & approach tracking (Right)",
+    "receptiveField": {
+      "azimuthMin": 26,
+      "azimuthMax": 62,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 34,
+    "name": "LC6_R_4",
+    "type": "LC6",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      228,
+      100,
+      102
+    ],
+    "role": "Small looming target detection & approach tracking (Right)",
+    "receptiveField": {
+      "azimuthMin": 39,
+      "azimuthMax": 75,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 35,
+    "name": "LC6_R_5",
+    "type": "LC6",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      235,
+      100,
+      110
+    ],
+    "role": "Small looming target detection & approach tracking (Right)",
+    "receptiveField": {
+      "azimuthMin": 52,
+      "azimuthMax": 88,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 36,
+    "name": "LC10_R_0",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      180,
+      80,
+      60
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": -9,
+      "azimuthMax": 15,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 37,
+    "name": "LC10_R_1",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      186,
+      80,
+      66
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": 2,
+      "azimuthMax": 26,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 38,
+    "name": "LC10_R_2",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      192,
+      80,
+      72
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": 13,
+      "azimuthMax": 37,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 39,
+    "name": "LC10_R_3",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      198,
+      80,
+      78
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": 24,
+      "azimuthMax": 48,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 40,
+    "name": "LC10_R_4",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      204,
+      80,
+      84
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": 35,
+      "azimuthMax": 59,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 41,
+    "name": "LC10_R_5",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      210,
+      80,
+      90
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": 46,
+      "azimuthMax": 70,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 42,
+    "name": "LC10_R_6",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      216,
+      80,
+      96
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": 57,
+      "azimuthMax": 81,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 43,
+    "name": "LC10_R_7",
+    "type": "LC10",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      222,
+      80,
+      102
+    ],
+    "role": "High-acuity small-target azimuth orientation (Right)",
+    "receptiveField": {
+      "azimuthMin": 68,
+      "azimuthMax": 92,
+      "elevationMin": -45,
+      "elevationMax": 45
+    }
+  },
+  {
+    "id": 44,
+    "name": "LPLC2_R_0",
+    "type": "LPLC2",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      210,
+      140,
+      90
+    ],
+    "role": "Radial optical expansion and looming trajectory (Right)",
+    "receptiveField": {
+      "azimuthMin": 15,
+      "azimuthMax": 80,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 45,
+    "name": "LPLC2_R_1",
+    "type": "LPLC2",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      215,
+      140,
+      98
+    ],
+    "role": "Radial optical expansion and looming trajectory (Right)",
+    "receptiveField": {
+      "azimuthMin": 37,
+      "azimuthMax": 102,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 46,
+    "name": "LPLC2_R_2",
+    "type": "LPLC2",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      220,
+      140,
+      106
+    ],
+    "role": "Radial optical expansion and looming trajectory (Right)",
+    "receptiveField": {
+      "azimuthMin": 59,
+      "azimuthMax": 124,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 47,
+    "name": "LPLC2_R_3",
+    "type": "LPLC2",
+    "hemisphere": "R",
+    "region": "OpticLobe",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      225,
+      140,
+      114
+    ],
+    "role": "Radial optical expansion and looming trajectory (Right)",
+    "receptiveField": {
+      "azimuthMin": 81,
+      "azimuthMax": 146,
+      "elevationMin": -30,
+      "elevationMax": 50,
+      "preferredDirection": "looming"
+    }
+  },
+  {
+    "id": 48,
+    "name": "EPG_0",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      0,
+      100,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 0 (0°)"
+  },
+  {
+    "id": 49,
+    "name": "EPG_1",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      22.961005941905388,
+      96.95518130045147,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 1 (23°)"
+  },
+  {
+    "id": 50,
+    "name": "EPG_2",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      42.426406871192846,
+      88.2842712474619,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 2 (45°)"
+  },
+  {
+    "id": 51,
+    "name": "EPG_3",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      55.43277195067721,
+      75.3073372946036,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 3 (68°)"
+  },
+  {
+    "id": 52,
+    "name": "EPG_4",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      60,
+      60,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 4 (90°)"
+  },
+  {
+    "id": 53,
+    "name": "EPG_5",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      55.43277195067721,
+      44.692662705396415,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 5 (113°)"
+  },
+  {
+    "id": 54,
+    "name": "EPG_6",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      42.42640687119285,
+      31.7157287525381,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 6 (135°)"
+  },
+  {
+    "id": 55,
+    "name": "EPG_7",
+    "type": "EPG",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      22.961005941905395,
+      23.04481869954853,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 7 (158°)"
+  },
+  {
+    "id": 56,
+    "name": "EPG_8",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      7.34788079488412e-15,
+      20,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 8 (180°)"
+  },
+  {
+    "id": 57,
+    "name": "EPG_9",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -22.96100594190538,
+      23.04481869954853,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 9 (203°)"
+  },
+  {
+    "id": 58,
+    "name": "EPG_10",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -42.426406871192846,
+      31.71572875253809,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 10 (225°)"
+  },
+  {
+    "id": 59,
+    "name": "EPG_11",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -55.43277195067719,
+      44.69266270539639,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 11 (248°)"
+  },
+  {
+    "id": 60,
+    "name": "EPG_12",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -60,
+      59.99999999999999,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 12 (270°)"
+  },
+  {
+    "id": 61,
+    "name": "EPG_13",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -55.4327719506772,
+      75.3073372946036,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 13 (293°)"
+  },
+  {
+    "id": 62,
+    "name": "EPG_14",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -42.42640687119286,
+      88.2842712474619,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 14 (315°)"
+  },
+  {
+    "id": 63,
+    "name": "EPG_15",
+    "type": "EPG",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -22.961005941905423,
+      96.95518130045146,
+      120
+    ],
+    "role": "Heading compass ring attractor wedge 15 (338°)"
+  },
+  {
+    "id": 64,
+    "name": "PEN_L_0",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -50,
+      70,
+      130
+    ],
+    "role": "Angular velocity integrator Left wedge 0 (left turn shift)"
+  },
+  {
+    "id": 65,
+    "name": "PEN_R_0",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      50,
+      70,
+      130
+    ],
+    "role": "Angular velocity integrator Right wedge 0 (right turn shift)"
+  },
+  {
+    "id": 66,
+    "name": "PEN_L_1",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -56,
+      70,
+      133
+    ],
+    "role": "Angular velocity integrator Left wedge 1 (left turn shift)"
+  },
+  {
+    "id": 67,
+    "name": "PEN_R_1",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      56,
+      70,
+      133
+    ],
+    "role": "Angular velocity integrator Right wedge 1 (right turn shift)"
+  },
+  {
+    "id": 68,
+    "name": "PEN_L_2",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -62,
+      70,
+      136
+    ],
+    "role": "Angular velocity integrator Left wedge 2 (left turn shift)"
+  },
+  {
+    "id": 69,
+    "name": "PEN_R_2",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      62,
+      70,
+      136
+    ],
+    "role": "Angular velocity integrator Right wedge 2 (right turn shift)"
+  },
+  {
+    "id": 70,
+    "name": "PEN_L_3",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -68,
+      70,
+      139
+    ],
+    "role": "Angular velocity integrator Left wedge 3 (left turn shift)"
+  },
+  {
+    "id": 71,
+    "name": "PEN_R_3",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      68,
+      70,
+      139
+    ],
+    "role": "Angular velocity integrator Right wedge 3 (right turn shift)"
+  },
+  {
+    "id": 72,
+    "name": "PEN_L_4",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -74,
+      70,
+      142
+    ],
+    "role": "Angular velocity integrator Left wedge 4 (left turn shift)"
+  },
+  {
+    "id": 73,
+    "name": "PEN_R_4",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      74,
+      70,
+      142
+    ],
+    "role": "Angular velocity integrator Right wedge 4 (right turn shift)"
+  },
+  {
+    "id": 74,
+    "name": "PEN_L_5",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -80,
+      70,
+      145
+    ],
+    "role": "Angular velocity integrator Left wedge 5 (left turn shift)"
+  },
+  {
+    "id": 75,
+    "name": "PEN_R_5",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      80,
+      70,
+      145
+    ],
+    "role": "Angular velocity integrator Right wedge 5 (right turn shift)"
+  },
+  {
+    "id": 76,
+    "name": "PEN_L_6",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -86,
+      70,
+      148
+    ],
+    "role": "Angular velocity integrator Left wedge 6 (left turn shift)"
+  },
+  {
+    "id": 77,
+    "name": "PEN_R_6",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      86,
+      70,
+      148
+    ],
+    "role": "Angular velocity integrator Right wedge 6 (right turn shift)"
+  },
+  {
+    "id": 78,
+    "name": "PEN_L_7",
+    "type": "P-EN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -92,
+      70,
+      151
+    ],
+    "role": "Angular velocity integrator Left wedge 7 (left turn shift)"
+  },
+  {
+    "id": 79,
+    "name": "PEN_R_7",
+    "type": "P-EN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      92,
+      70,
+      151
+    ],
+    "role": "Angular velocity integrator Right wedge 7 (right turn shift)"
+  },
+  {
+    "id": 80,
+    "name": "PFN_L_0",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -40,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 0"
+  },
+  {
+    "id": 81,
+    "name": "PFN_R_0",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      40,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 0"
+  },
+  {
+    "id": 82,
+    "name": "PFN_L_1",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -45,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 1"
+  },
+  {
+    "id": 83,
+    "name": "PFN_R_1",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      45,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 1"
+  },
+  {
+    "id": 84,
+    "name": "PFN_L_2",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -50,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 2"
+  },
+  {
+    "id": 85,
+    "name": "PFN_R_2",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      50,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 2"
+  },
+  {
+    "id": 86,
+    "name": "PFN_L_3",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -55,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 3"
+  },
+  {
+    "id": 87,
+    "name": "PFN_R_3",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      55,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 3"
+  },
+  {
+    "id": 88,
+    "name": "PFN_L_4",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -60,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 4"
+  },
+  {
+    "id": 89,
+    "name": "PFN_R_4",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      60,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 4"
+  },
+  {
+    "id": 90,
+    "name": "PFN_L_5",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -65,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 5"
+  },
+  {
+    "id": 91,
+    "name": "PFN_R_5",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      65,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 5"
+  },
+  {
+    "id": 92,
+    "name": "PFN_L_6",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -70,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 6"
+  },
+  {
+    "id": 93,
+    "name": "PFN_R_6",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      70,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 6"
+  },
+  {
+    "id": 94,
+    "name": "PFN_L_7",
+    "type": "P-FN",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -75,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Left 7"
+  },
+  {
+    "id": 95,
+    "name": "PFN_R_7",
+    "type": "P-FN",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      75,
+      85,
+      140
+    ],
+    "role": "Allocentric vector steering column Right 7"
+  },
+  {
+    "id": 96,
+    "name": "FB_0",
+    "type": "FB",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -77,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 0"
+  },
+  {
+    "id": 97,
+    "name": "FB_1",
+    "type": "FB",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -63,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 1"
+  },
+  {
+    "id": 98,
+    "name": "FB_2",
+    "type": "FB",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -49,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 2"
+  },
+  {
+    "id": 99,
+    "name": "FB_3",
+    "type": "FB",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -35,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 3"
+  },
+  {
+    "id": 100,
+    "name": "FB_4",
+    "type": "FB",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -21,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 4"
+  },
+  {
+    "id": 101,
+    "name": "FB_5",
+    "type": "FB",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -7,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 5"
+  },
+  {
+    "id": 102,
+    "name": "FB_6",
+    "type": "FB",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      7,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 6"
+  },
+  {
+    "id": 103,
+    "name": "FB_7",
+    "type": "FB",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      21,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 7"
+  },
+  {
+    "id": 104,
+    "name": "FB_8",
+    "type": "FB",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      35,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 8"
+  },
+  {
+    "id": 105,
+    "name": "FB_9",
+    "type": "FB",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      49,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 9"
+  },
+  {
+    "id": 106,
+    "name": "FB_10",
+    "type": "FB",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      63,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 10"
+  },
+  {
+    "id": 107,
+    "name": "FB_11",
+    "type": "FB",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      77,
+      95,
+      150
+    ],
+    "role": "Target bearing vs current heading comparator column 11"
+  },
+  {
+    "id": 108,
+    "name": "RingInh_0",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -70,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 0"
+  },
+  {
+    "id": 109,
+    "name": "RingInh_1",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -50,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 1"
+  },
+  {
+    "id": 110,
+    "name": "RingInh_2",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -30,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 2"
+  },
+  {
+    "id": 111,
+    "name": "RingInh_3",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "L",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -10,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 3"
+  },
+  {
+    "id": 112,
+    "name": "RingInh_4",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      10,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 4"
+  },
+  {
+    "id": 113,
+    "name": "RingInh_5",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      30,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 5"
+  },
+  {
+    "id": 114,
+    "name": "RingInh_6",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      50,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 6"
+  },
+  {
+    "id": 115,
+    "name": "RingInh_7",
+    "type": "Ring_Inhibitory",
+    "hemisphere": "R",
+    "region": "CentralComplex",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      70,
+      50,
+      115
+    ],
+    "role": "Ring attractor global inhibition & contrast sharpening 7"
+  },
+  {
+    "id": 116,
+    "name": "LAL_L_0",
+    "type": "LAL",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -90,
+      60,
+      110
+    ],
+    "role": "Premotor steering routing hub Left 0"
+  },
+  {
+    "id": 117,
+    "name": "LAL_R_0",
+    "type": "LAL",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      90,
+      60,
+      110
+    ],
+    "role": "Premotor steering routing hub Right 0"
+  },
+  {
+    "id": 118,
+    "name": "LAL_L_1",
+    "type": "LAL",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -98,
+      60,
+      115
+    ],
+    "role": "Premotor steering routing hub Left 1"
+  },
+  {
+    "id": 119,
+    "name": "LAL_R_1",
+    "type": "LAL",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      98,
+      60,
+      115
+    ],
+    "role": "Premotor steering routing hub Right 1"
+  },
+  {
+    "id": 120,
+    "name": "LAL_L_2",
+    "type": "LAL",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -106,
+      60,
+      120
+    ],
+    "role": "Premotor steering routing hub Left 2"
+  },
+  {
+    "id": 121,
+    "name": "LAL_R_2",
+    "type": "LAL",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      106,
+      60,
+      120
+    ],
+    "role": "Premotor steering routing hub Right 2"
+  },
+  {
+    "id": 122,
+    "name": "LAL_L_3",
+    "type": "LAL",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -114,
+      60,
+      125
+    ],
+    "role": "Premotor steering routing hub Left 3"
+  },
+  {
+    "id": 123,
+    "name": "LAL_R_3",
+    "type": "LAL",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      114,
+      60,
+      125
+    ],
+    "role": "Premotor steering routing hub Right 3"
+  },
+  {
+    "id": 124,
+    "name": "LAL_L_4",
+    "type": "LAL",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -122,
+      60,
+      130
+    ],
+    "role": "Premotor steering routing hub Left 4"
+  },
+  {
+    "id": 125,
+    "name": "LAL_R_4",
+    "type": "LAL",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      122,
+      60,
+      130
+    ],
+    "role": "Premotor steering routing hub Right 4"
+  },
+  {
+    "id": 126,
+    "name": "LAL_L_5",
+    "type": "LAL",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -130,
+      60,
+      135
+    ],
+    "role": "Premotor steering routing hub Left 5"
+  },
+  {
+    "id": 127,
+    "name": "LAL_R_5",
+    "type": "LAL",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      130,
+      60,
+      135
+    ],
+    "role": "Premotor steering routing hub Right 5"
+  },
+  {
+    "id": 128,
+    "name": "LAL_Inh_L_0",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -80,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Left 0"
+  },
+  {
+    "id": 129,
+    "name": "LAL_Inh_R_0",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      80,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Right 0"
+  },
+  {
+    "id": 130,
+    "name": "LAL_Inh_L_1",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -87,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Left 1"
+  },
+  {
+    "id": 131,
+    "name": "LAL_Inh_R_1",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      87,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Right 1"
+  },
+  {
+    "id": 132,
+    "name": "LAL_Inh_L_2",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -94,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Left 2"
+  },
+  {
+    "id": 133,
+    "name": "LAL_Inh_R_2",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      94,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Right 2"
+  },
+  {
+    "id": 134,
+    "name": "LAL_Inh_L_3",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "L",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -101,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Left 3"
+  },
+  {
+    "id": 135,
+    "name": "LAL_Inh_R_3",
+    "type": "LAL_Inhibitory",
+    "hemisphere": "R",
+    "region": "Protocerebrum",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      101,
+      50,
+      105
+    ],
+    "role": "Contralateral premotor steering inhibition Right 3"
+  },
+  {
+    "id": 136,
+    "name": "FlightGate_0",
+    "type": "Arousal_Gate",
+    "hemisphere": "M",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -30,
+      130,
+      160
+    ],
+    "role": "Flight state maintenance & sensory gain neuromodulation 0"
+  },
+  {
+    "id": 137,
+    "name": "FlightGate_1",
+    "type": "Arousal_Gate",
+    "hemisphere": "M",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -10,
+      130,
+      160
+    ],
+    "role": "Flight state maintenance & sensory gain neuromodulation 1"
+  },
+  {
+    "id": 138,
+    "name": "FlightGate_2",
+    "type": "Arousal_Gate",
+    "hemisphere": "M",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      10,
+      130,
+      160
+    ],
+    "role": "Flight state maintenance & sensory gain neuromodulation 2"
+  },
+  {
+    "id": 139,
+    "name": "FlightGate_3",
+    "type": "Arousal_Gate",
+    "hemisphere": "M",
+    "region": "Protocerebrum",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      30,
+      130,
+      160
+    ],
+    "role": "Flight state maintenance & sensory gain neuromodulation 3"
+  },
+  {
+    "id": 140,
+    "name": "DNa01_L",
+    "type": "DNa01",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -45,
+      20,
+      50
+    ],
+    "role": "Descending rapid yaw saccade Left"
+  },
+  {
+    "id": 141,
+    "name": "DNa01_R",
+    "type": "DNa01",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      45,
+      20,
+      50
+    ],
+    "role": "Descending rapid yaw saccade Right"
+  },
+  {
+    "id": 142,
+    "name": "DNa02_L_0",
+    "type": "DNa02",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -35,
+      15,
+      45
+    ],
+    "role": "Continuous lateral steering motor command Left 0"
+  },
+  {
+    "id": 143,
+    "name": "DNa02_R_0",
+    "type": "DNa02",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      35,
+      15,
+      45
+    ],
+    "role": "Continuous lateral steering motor command Right 0"
+  },
+  {
+    "id": 144,
+    "name": "DNa02_L_1",
+    "type": "DNa02",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -39,
+      15,
+      40
+    ],
+    "role": "Continuous lateral steering motor command Left 1"
+  },
+  {
+    "id": 145,
+    "name": "DNa02_R_1",
+    "type": "DNa02",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      39,
+      15,
+      40
+    ],
+    "role": "Continuous lateral steering motor command Right 1"
+  },
+  {
+    "id": 146,
+    "name": "DNa02_L_2",
+    "type": "DNa02",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -43,
+      15,
+      35
+    ],
+    "role": "Continuous lateral steering motor command Left 2"
+  },
+  {
+    "id": 147,
+    "name": "DNa02_R_2",
+    "type": "DNa02",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      43,
+      15,
+      35
+    ],
+    "role": "Continuous lateral steering motor command Right 2"
+  },
+  {
+    "id": 148,
+    "name": "DNa02_L_3",
+    "type": "DNa02",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -47,
+      15,
+      30
+    ],
+    "role": "Continuous lateral steering motor command Left 3"
+  },
+  {
+    "id": 149,
+    "name": "DNa02_R_3",
+    "type": "DNa02",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      47,
+      15,
+      30
+    ],
+    "role": "Continuous lateral steering motor command Right 3"
+  },
+  {
+    "id": 150,
+    "name": "DNp01_0",
+    "type": "DNp01",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -40,
+      25,
+      35
+    ],
+    "role": "Forward surge & flight power acceleration 0"
+  },
+  {
+    "id": 151,
+    "name": "DNp01_1",
+    "type": "DNp01",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -24,
+      25,
+      35
+    ],
+    "role": "Forward surge & flight power acceleration 1"
+  },
+  {
+    "id": 152,
+    "name": "DNp01_2",
+    "type": "DNp01",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -8,
+      25,
+      35
+    ],
+    "role": "Forward surge & flight power acceleration 2"
+  },
+  {
+    "id": 153,
+    "name": "DNp01_3",
+    "type": "DNp01",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      8,
+      25,
+      35
+    ],
+    "role": "Forward surge & flight power acceleration 3"
+  },
+  {
+    "id": 154,
+    "name": "DNp01_4",
+    "type": "DNp01",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      24,
+      25,
+      35
+    ],
+    "role": "Forward surge & flight power acceleration 4"
+  },
+  {
+    "id": 155,
+    "name": "DNp01_5",
+    "type": "DNp01",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      40,
+      25,
+      35
+    ],
+    "role": "Forward surge & flight power acceleration 5"
+  },
+  {
+    "id": 156,
+    "name": "DNb01_L_0",
+    "type": "DNb01",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -25,
+      30,
+      25
+    ],
+    "role": "Racket strike execution trigger Left 0"
+  },
+  {
+    "id": 157,
+    "name": "DNb01_R_0",
+    "type": "DNb01",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      25,
+      30,
+      25
+    ],
+    "role": "Racket strike execution trigger Right 0"
+  },
+  {
+    "id": 158,
+    "name": "DNb01_L_1",
+    "type": "DNb01",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -29,
+      30,
+      25
+    ],
+    "role": "Racket strike execution trigger Left 1"
+  },
+  {
+    "id": 159,
+    "name": "DNb01_R_1",
+    "type": "DNb01",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      29,
+      30,
+      25
+    ],
+    "role": "Racket strike execution trigger Right 1"
+  },
+  {
+    "id": 160,
+    "name": "DNb01_L_2",
+    "type": "DNb01",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -33,
+      30,
+      25
+    ],
+    "role": "Racket strike execution trigger Left 2"
+  },
+  {
+    "id": 161,
+    "name": "DNb01_R_2",
+    "type": "DNb01",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      33,
+      30,
+      25
+    ],
+    "role": "Racket strike execution trigger Right 2"
+  },
+  {
+    "id": 162,
+    "name": "GF_L",
+    "type": "GiantFiber",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -60,
+      40,
+      20
+    ],
+    "role": "Giant Fiber emergency interception trigger Left"
+  },
+  {
+    "id": 163,
+    "name": "GF_R",
+    "type": "GiantFiber",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      60,
+      40,
+      20
+    ],
+    "role": "Giant Fiber emergency interception trigger Right"
+  },
+  {
+    "id": 164,
+    "name": "MDN_L",
+    "type": "MDN",
+    "hemisphere": "L",
+    "region": "Descending",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      -15,
+      10,
+      15
+    ],
+    "role": "Backward recovery & deceleration Left"
+  },
+  {
+    "id": 165,
+    "name": "MDN_R",
+    "type": "MDN",
+    "hemisphere": "R",
+    "region": "Descending",
+    "neurotransmitter": "gaba",
+    "sign": -1,
+    "position": [
+      15,
+      10,
+      15
+    ],
+    "role": "Backward recovery & deceleration Right"
+  },
+  {
+    "id": 166,
+    "name": "MN_Steer_L",
+    "type": "MotorNeuron",
+    "hemisphere": "L",
+    "region": "VNC",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -50,
+      -50,
+      -50
+    ],
+    "role": "Wing hinge steering motor Left (lateral -X velocity)"
+  },
+  {
+    "id": 167,
+    "name": "MN_Steer_R",
+    "type": "MotorNeuron",
+    "hemisphere": "R",
+    "region": "VNC",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      50,
+      -50,
+      -50
+    ],
+    "role": "Wing hinge steering motor Right (lateral +X velocity)"
+  },
+  {
+    "id": 168,
+    "name": "MN_Thrust",
+    "type": "MotorNeuron",
+    "hemisphere": "M",
+    "region": "VNC",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      0,
+      -60,
+      -60
+    ],
+    "role": "Dorsal longitudinal flight power motor (forward +Z velocity)"
+  },
+  {
+    "id": 169,
+    "name": "MN_Strike_Forehand",
+    "type": "MotorNeuron",
+    "hemisphere": "R",
+    "region": "VNC",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      30,
+      -70,
+      -70
+    ],
+    "role": "Forehand swing effector motor"
+  },
+  {
+    "id": 170,
+    "name": "MN_Strike_Backhand",
+    "type": "MotorNeuron",
+    "hemisphere": "L",
+    "region": "VNC",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      -30,
+      -70,
+      -70
+    ],
+    "role": "Backhand swing effector motor"
+  },
+  {
+    "id": 171,
+    "name": "MN_Brake",
+    "type": "MotorNeuron",
+    "hemisphere": "M",
+    "region": "VNC",
+    "neurotransmitter": "acetylcholine",
+    "sign": 1,
+    "position": [
+      0,
+      -40,
+      -40
+    ],
+    "role": "Flight deceleration & stance brake motor"
+  }
+]

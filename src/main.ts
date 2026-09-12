@@ -13,6 +13,8 @@ import {
 } from "./motion";
 import { AudioManager } from "./audio";
 import { DebugInput, syntheticPose } from "./synthetic";
+import { BrainRenderer } from "./flybrain/brainRenderer";
+
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const settings = readSettings(),
@@ -34,18 +36,151 @@ let screen = "home",
   trackingPaused = false,
   recovery = 0,
   toastUntil = 0,
-  syntheticTime = 0;
+  syntheticTime = 0,
+  brainPanelOpen = false;
+
 $("#app").innerHTML = `
 <div id="court"></div><div class="vignette"></div>
-<header><a class="brand" href="#" aria-label="Motion Badminton home"><span class="brand-icon">↗</span> MOTION<span class="brand-light">BADMINTON</span></a><div class="header-right"><span class="local"><i></i> LOCAL PLAY · PRIVATE BY DESIGN</span><button class="icon" id="settings-open" aria-label="Settings">⚙</button></div></header>
-<main id="home" class="panel screen"><div class="eyebrow">STEP INTO THE GAME / 01</div><h1>Your body.<br>Your <em>game.</em></h1><p class="intro">Play badminton from where you stand.<br>Lean and swing naturally — your avatar covers the court.<br>All you need is your webcam.</p><button class="primary" id="play">PLAY WITH CAMERA <span>↗</span></button><div class="home-actions"><button id="calibrate">Calibrate</button><button id="home-settings">Settings</button><button id="quit">Quit</button></div><div class="safety">↔ &nbsp; Clear a comfortable arm-span around you before playing.<small>Stay in place (~1m area). Avatar handles court traversal.</small></div><button id="keyboard" class="text-button">No camera? Open keyboard test →</button><div class="feature-row"><span>01 <b>CONNECT</b></span><span>02 <b>CALIBRATE</b></span><span>03 <b>RALLY</b></span></div></main>
-<div id="home-caption"><span>PLAY FROM WHERE YOU STAND</span><b>Less space.<br>More instinct.</b><small>WEBCAM INTENT CONTROL / AUTO-FOOTWORK / LOCAL PROTOTYPE</small></div>
-<section id="calibration" class="screen hidden dialog"><div class="eyebrow">FIND YOUR FORM</div><h2>Let’s get you ready.</h2><p id="calibration-message">Connecting your camera…</p><div class="progress"><i id="calibration-progress"></i></div><div class="steps"><span>Position</span><span>Racket hand</span><span>Reach & Intent</span></div><p class="muted">Face the camera with your upper body visible.<br>Stay in place — small body shifts and natural swings control the game.</p><button id="calibration-cancel" class="secondary">Back to home</button></section>
-<div id="hud" class="screen hidden"><div class="scoreboard"><div><span>YOU</span><b id="your-score">00</b></div><i>:</i><div><span>OPPONENT</span><b id="ai-score">00</b></div><small>RALLY SCORING · FIRST TO 21</small></div><div class="session-label"><i></i><span id="control-label">CAMERA CONTROL</span><span id="tracking-status">TRACKING</span></div><button class="secondary" id="pause">Ⅱ &nbsp; Pause</button><div id="rally-hint"><span id="shot-label">READY</span><b id="instruction">Swing gently upward to serve</b><small id="rally-count">RALLY 0</small></div><div id="keyboard-help" class="hidden">A / D intent · W / S reach · SPACE swing · 1 clear / 2 drive / 3 drop / 4 smash / 5 lift</div></div>
-<section id="pause-screen" class="screen hidden dialog"><div class="eyebrow">TAKE A BREATHER</div><h2>Match paused.</h2><p>Your next rally is waiting.</p><button id="resume" class="primary">BACK TO COURT ↗</button><button id="recalibrate" class="secondary">Recalibrate camera</button><button id="restart" class="secondary">Restart match</button><button id="back-home" class="text-button">Return home</button></section>
-<section id="results" class="screen hidden dialog"><div class="eyebrow">THAT’S A MATCH</div><h2 id="result-title">Well played.</h2><div id="result-score" class="result-score"></div><p id="result-stats"></p><button id="play-again" class="primary">PLAY AGAIN ↗</button><button id="results-home" class="secondary">Home</button></section>
-<section id="settings" class="screen hidden dialog"><div class="eyebrow">MAKE IT YOUR GAME</div><h2>Settings</h2><div class="setting-grid"><label>Camera<select id="camera-select"><option value="">Default camera</option></select></label><label>Opponent<select id="difficulty"><option value="easy">Easy</option><option value="normal">Normal</option></select></label><label>Motion assistance<select id="assist"><option value="beginner">Beginner</option><option value="normal">Normal</option></select></label><label>Swing sensitivity<input id="sensitivity" type="range" min="0.6" max="1.8" step="0.1"></label><label>Movement sensitivity<input id="movement" type="range" min="0.5" max="1.8" step="0.1"></label><label>Audio volume<input id="volume" type="range" min="0" max="1" step="0.05"></label><label class="check"><input id="preview" type="checkbox"> Webcam preview</label><label class="check"><input id="debug" type="checkbox"> Developer overlay</label></div><p class="muted">Racket hand: <span id="hand-label">not calibrated</span>. Recalibrate to change hands.<br>Changing camera requires recalibration.</p><button id="settings-done" class="primary">SAVE SETTINGS</button><button id="synthetic" class="text-button">Run synthetic pose diagnostic →</button></section>
-<aside id="preview-box" class="hidden"><canvas id="skeleton" width="640" height="480"></canvas><span id="preview-label">LIVE · ON DEVICE</span></aside><pre id="debug-overlay" class="hidden"></pre><div id="tracking-warning" class="hidden">Step back into frame<small>The rally is paused until tracking is stable.</small></div><div id="toast" role="status" class="hidden"></div><div id="error" role="alert" class="hidden"><b>Let’s fix that.</b><p id="error-message"></p><button id="error-close" class="secondary">Got it</button></div><footer><span>PLAY FROM WHERE YOU STAND.</span><span>MOTION LAB / PROTOTYPE 0.2</span></footer>`;
+<header>
+  <a class="brand" href="#" aria-label="Motion Badminton home"><span class="brand-icon">↗</span> MOTION<span class="brand-light">BADMINTON</span></a>
+  <div class="header-right">
+    <button id="btn-toggle-brain" class="brain-nav-btn">🧠 CONNECTOME LAB</button>
+    <span class="local"><i></i> LOCAL PLAY · PRIVATE BY DESIGN</span>
+    <button class="icon" id="settings-open" aria-label="Settings">⚙</button>
+  </div>
+</header>
+<main id="home" class="panel screen">
+  <div class="eyebrow">STEP INTO THE GAME / 01</div>
+  <h1>Human vs Fruit-Fly.<br>Connectome <em>Badminton.</em></h1>
+  <p class="intro">Play badminton against an opponent powered by a real <em>Drosophila</em> connectome simulation (MaleCNS v1.0).<br>Stand in place, lean, and swing naturally.</p>
+  <button class="primary" id="play">PLAY WITH CAMERA <span>↗</span></button>
+  <div class="home-actions">
+    <button id="calibrate">Calibrate</button>
+    <button id="home-settings">Settings</button>
+    <button id="quit">Quit</button>
+  </div>
+  <div class="safety">↔ &nbsp; Clear a comfortable arm-span around you before playing.<small>Stay in place (~1m area). Avatar handles court traversal.</small></div>
+  <button id="keyboard" class="text-button">No camera? Open keyboard test →</button>
+  <div class="feature-row"><span>01 <b>CONNECT</b></span><span>02 <b>CALIBRATE</b></span><span>03 <b>RALLY</b></span></div>
+</main>
+<div id="home-caption">
+  <span>PLAY AGAINST A REAL CONNECTOME</span>
+  <b>160K Synapses.<br>Zero Scripting.</b>
+  <small>JANELIA MALECNS v1.0 / LIF NEURAL SIMULATION / AUTO-FOOTWORK</small>
+</div>
+<section id="calibration" class="screen hidden dialog">
+  <div class="eyebrow">FIND YOUR FORM</div>
+  <h2>Let’s get you ready.</h2>
+  <p id="calibration-message">Connecting your camera…</p>
+  <div class="progress"><i id="calibration-progress"></i></div>
+  <div class="steps"><span>Position</span><span>Racket hand</span><span>Reach & Intent</span></div>
+  <p class="muted">Face the camera with your upper body visible.<br>Stay in place — small body shifts and natural swings control the game.</p>
+  <button id="calibration-cancel" class="secondary">Back to home</button>
+</section>
+<div id="hud" class="screen hidden">
+  <div class="scoreboard">
+    <div><span>YOU</span><b id="your-score">00</b></div>
+    <i>:</i>
+    <div><span id="opp-label">FRUIT-FLY</span><b id="ai-score">00</b></div>
+    <small>RALLY SCORING · FIRST TO 21</small>
+  </div>
+  <div class="session-label">
+    <i></i>
+    <span id="control-label">CAMERA CONTROL</span>
+    <span id="tracking-status">TRACKING</span>
+  </div>
+  <button class="secondary" id="pause">Ⅱ &nbsp; Pause</button>
+  <div id="rally-hint">
+    <span id="shot-label">READY</span>
+    <b id="instruction">Swing gently upward to serve</b>
+    <small id="rally-count">RALLY 0</small>
+  </div>
+  <div id="keyboard-help" class="hidden">A / D intent · W / S reach · SPACE swing · 1 clear / 2 drive / 3 drop / 4 smash / 5 lift</div>
+</div>
+<section id="pause-screen" class="screen hidden dialog">
+  <div class="eyebrow">TAKE A BREATHER</div>
+  <h2>Match paused.</h2>
+  <p>Your next rally is waiting.</p>
+  <button id="resume" class="primary">BACK TO COURT ↗</button>
+  <button id="recalibrate" class="secondary">Recalibrate camera</button>
+  <button id="restart" class="secondary">Restart match</button>
+  <button id="back-home" class="text-button">Return home</button>
+</section>
+<section id="results" class="screen hidden dialog">
+  <div class="eyebrow">THAT’S A MATCH</div>
+  <h2 id="result-title">Well played.</h2>
+  <div id="result-score" class="result-score"></div>
+  <p id="result-stats"></p>
+  <button id="play-again" class="primary">PLAY AGAIN ↗</button>
+  <button id="results-home" class="secondary">Home</button>
+</section>
+<section id="settings" class="screen hidden dialog">
+  <div class="eyebrow">MAKE IT YOUR GAME</div>
+  <h2>Settings</h2>
+  <div class="setting-grid">
+    <label>Opponent Type
+      <select id="opponent-type">
+        <option value="fruitfly">Fruit-Fly Connectome (MaleCNS v1.0)</option>
+        <option value="classic">Classic Scripted AI</option>
+      </select>
+    </label>
+    <label>Camera<select id="camera-select"><option value="">Default camera</option></select></label>
+    <label>Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal">Normal</option></select></label>
+    <label>Motion assistance<select id="assist"><option value="beginner">Beginner</option><option value="normal">Normal</option></select></label>
+    <label>Swing sensitivity<input id="sensitivity" type="range" min="0.6" max="1.8" step="0.1"></label>
+    <label>Movement sensitivity<input id="movement" type="range" min="0.5" max="1.8" step="0.1"></label>
+    <label>Audio volume<input id="volume" type="range" min="0" max="1" step="0.05"></label>
+    <label class="check"><input id="preview" type="checkbox"> Webcam preview</label>
+    <label class="check"><input id="debug" type="checkbox"> Developer overlay</label>
+  </div>
+  <p class="muted">Racket hand: <span id="hand-label">not calibrated</span>. Recalibrate to change hands.<br>Changing camera requires recalibration.</p>
+  <button id="settings-done" class="primary">SAVE SETTINGS</button>
+  <button id="synthetic" class="text-button">Run synthetic pose diagnostic →</button>
+</section>
+
+<!-- CONNECTOME NEURAL LAB PANEL -->
+<aside id="brain-panel" class="hidden">
+  <div class="brain-header">
+    <div>
+      <span class="brain-badge">MALE-CNS v1.0 LIVE TELEMETRY</span>
+      <h3>Fruit-Fly Connectome Lab</h3>
+    </div>
+    <div class="brain-view-tabs">
+      <button id="btn-view-circuit" class="active">Circuit</button>
+      <button id="btn-view-spatial">Spatial</button>
+      <button id="btn-view-raster">Raster</button>
+      <button id="btn-brain-close" aria-label="Close Brain Panel">✕</button>
+    </div>
+  </div>
+  <div id="brain-viewport"></div>
+  <div class="neural-lab-controls">
+    <div class="lab-title">
+      <span>OPTOGENETIC INTERVENTIONS</span>
+      <button id="btn-lab-reset" class="text-button">Reset All</button>
+    </div>
+    <div class="lab-toggles">
+      <button id="silence-lc4" class="lab-toggle">Silence Looming (LC4/6)</button>
+      <button id="silence-dna" class="lab-toggle">Silence Steering (DNa02)</button>
+      <button id="silence-dnb" class="lab-toggle">Silence Strike (DNb01)</button>
+    </div>
+    <div class="lab-sliders">
+      <label>Synaptic Gain <span id="gain-val">1.0x</span>
+        <input id="slider-gain" type="range" min="0.2" max="2.5" step="0.1" value="1.0">
+      </label>
+      <label>Sensory Drive <span id="drive-val">1.2</span>
+        <input id="slider-drive" type="range" min="0" max="4.0" step="0.2" value="1.2">
+      </label>
+    </div>
+  </div>
+</aside>
+
+<aside id="preview-box" class="hidden"><canvas id="skeleton" width="640" height="480"></canvas><span id="preview-label">LIVE · ON DEVICE</span></aside>
+<pre id="debug-overlay" class="hidden"></pre>
+<div id="tracking-warning" class="hidden">Step back into frame<small>The rally is paused until tracking is stable.</small></div>
+<div id="toast" role="status" class="hidden"></div>
+<div id="error" role="alert" class="hidden"><b>Let’s fix that.</b><p id="error-message"></p><button id="error-close" class="secondary">Got it</button></div>
+<footer><span>PLAY FROM WHERE YOU STAND.</span><span>CONNECTOME LAB / JANELIA MALECNS v1.0</span></footer>`;
+
 let renderer: CourtRenderer;
 try {
   renderer = new CourtRenderer($("#court"));
@@ -55,11 +190,28 @@ try {
   );
   throw new Error("WebGL unavailable");
 }
+
+let brainRenderer: BrainRenderer | null = null;
+try {
+  brainRenderer = new BrainRenderer($("#brain-viewport"));
+  // Initialize Drosophila connectome simulation
+  void game.fly.init(true, "/data/connectome").then(() => {
+    const g = game.fly.bridge.getConnectomeGraph();
+    if (g && brainRenderer) {
+      brainRenderer.setGraph(g);
+    }
+  });
+} catch (err) {
+  console.warn("BrainRenderer initialization deferred:", err);
+}
+
 $("#preview-box").prepend(camera.video);
+
 function showError(message: string) {
   $("#error-message").textContent = message;
   $("#error").classList.remove("hidden");
 }
+
 function setScreen(next: string) {
   screen = next;
   document
@@ -71,6 +223,7 @@ function setScreen(next: string) {
   debug.keys.clear();
   accumulator = 0;
 }
+
 function home() {
   camera.stop();
   calibrated = false;
@@ -79,6 +232,7 @@ function home() {
   trackingPaused = false;
   setScreen("home");
 }
+
 function startGame() {
   interpreter.reset();
   game.setMotion(neutralMotion());
@@ -87,6 +241,8 @@ function startGame() {
   trackingPaused = false;
   recovery = 0;
   setScreen("game");
+  $("#opp-label").textContent =
+    settings.opponentType === "fruitfly" ? "FRUIT-FLY" : "OPPONENT";
   $("#control-label").textContent =
     mode === "camera"
       ? "CAMERA CONTROL"
@@ -95,6 +251,7 @@ function startGame() {
         : "SYNTHETIC POSE DIAGNOSTIC";
   $("#keyboard-help").classList.toggle("hidden", mode !== "keyboard");
 }
+
 async function startCamera() {
   audio.unlock();
   audio.volume = settings.volume;
@@ -116,189 +273,254 @@ async function startCamera() {
     showError((e as Error).message);
   }
 }
+
 camera.onError = (message) => {
   if (screen === "game") setScreen("pause-screen");
   showError(message);
 };
-camera.onPose = (pose, time) => {
+
+camera.onPose = (pose, timestamp) => {
   lastPose = pose;
-  if (pose && poseQuality(pose) >= C.confidence) {
-    lastGood = performance.now();
-    if (screen === "calibration" && calibration) {
-      const result = calibration.update(
-        pose,
-        Math.min((time - previousPoseTime) / 1000, 0.1),
-      );
-      $("#calibration-message").textContent = result.message;
-      $("#calibration-progress").style.width = `${calibration.progress * 100}%`;
-      if (result.done) {
-        interpreter.calibration = result.done;
-        interpreter.reset();
-        calibrated = true;
-        $("#hand-label").textContent = result.done.hand;
-        startGame();
-      }
-    } else if (calibrated && screen === "game") {
-      const m = interpreter.update(
-        pose,
-        time,
-        settings.sensitivity,
-        settings.movement,
-      );
-      if (m) {
-        game.setMotion(m);
-        if (m.phase === "start") audio.play("swing");
-      }
+  const now = performance.now();
+  if (pose && poseQuality(pose)) lastGood = now;
+  if (screen === "calibration" && calibration) {
+    const dt = previousPoseTime
+      ? Math.max(0.008, Math.min(0.1, (timestamp - previousPoseTime) / 1000))
+      : 0.033;
+    previousPoseTime = timestamp;
+    const res = calibration.update(pose || undefined, dt);
+    $("#calibration-progress").style.width =
+      `${Math.round(calibration.progress * 100)}%`;
+    $("#calibration-message").textContent = res.message;
+    document
+      .querySelectorAll("#calibration .steps span")
+      .forEach((el, index) => {
+        el.classList.toggle("active", index === calibration!.stage);
+      });
+    if (res.done) {
+      calibrated = true;
+      interpreter.calibration = res.done;
+      $("#hand-label").textContent = `${res.done.hand.toUpperCase()} HAND`;
+      startGame();
     }
-  } else {
-    interpreter.reset();
-    if (screen === "calibration") {
-      $("#calibration-message").textContent =
-        camera.brightness < 35
-          ? "Add light in front of you so the camera can see your arms."
-          : "Step into frame. Keep shoulders, wrists and hips visible.";
-      calibration?.update(undefined, 0);
-    }
+    return;
   }
-  previousPoseTime = time;
+  if (screen === "game" && calibrated && pose) {
+    const motion = interpreter.update(pose, timestamp);
+    if (motion) game.setMotion(motion);
+  }
 };
-async function populateCameras() {
-  try {
-    const devices = await camera.devices();
-    const select = $<HTMLSelectElement>("#camera-select");
-    select.replaceChildren(
-      new Option("Default camera", ""),
-      ...devices.map(
-        (d, i) => new Option(d.label || `Camera ${i + 1}`, d.deviceId),
-      ),
-    );
-    select.value = settings.camera;
-  } catch {
-    /* Permission-dependent enumeration can be unavailable before camera access. */
+
+function toast(text: string) {
+  const el = $("#toast");
+  el.textContent = text;
+  el.classList.remove("hidden");
+  toastUntil = performance.now() + 1800;
+}
+
+// --- Brain Panel & Neural Lab Event Listeners ---
+function toggleBrainPanel(open?: boolean) {
+  brainPanelOpen = open !== undefined ? open : !brainPanelOpen;
+  $("#brain-panel").classList.toggle("hidden", !brainPanelOpen);
+  if (brainPanelOpen && brainRenderer) {
+    brainRenderer.resize();
   }
 }
-let settingsReturn = "home";
-function openSettings() {
-  settingsReturn = screen === "game" ? "pause-screen" : screen;
-  setScreen("settings");
-  for (const key of [
-    "difficulty",
-    "assist",
-    "sensitivity",
-    "movement",
-    "volume",
-  ] as const)
-    $<HTMLInputElement>(`#${key}`).value = String(settings[key]);
-  for (const key of ["preview", "debug"] as const)
-    $<HTMLInputElement>(`#${key}`).checked = settings[key];
-  void populateCameras();
+
+$("#btn-toggle-brain").addEventListener("click", () => toggleBrainPanel());
+$("#btn-brain-close").addEventListener("click", () => toggleBrainPanel(false));
+
+$("#btn-view-circuit").addEventListener("click", () => {
+  brainRenderer?.setViewMode("circuit");
+  document
+    .querySelectorAll(".brain-view-tabs button")
+    .forEach((b) => b.classList.remove("active"));
+  $("#btn-view-circuit").classList.add("active");
+});
+$("#btn-view-spatial").addEventListener("click", () => {
+  brainRenderer?.setViewMode("spatial");
+  document
+    .querySelectorAll(".brain-view-tabs button")
+    .forEach((b) => b.classList.remove("active"));
+  $("#btn-view-spatial").classList.add("active");
+});
+$("#btn-view-raster").addEventListener("click", () => {
+  brainRenderer?.setViewMode("raster");
+  document
+    .querySelectorAll(".brain-view-tabs button")
+    .forEach((b) => b.classList.remove("active"));
+  $("#btn-view-raster").classList.add("active");
+});
+
+// Interventions Toggles
+let silencedLC = false;
+let silencedDNa = false;
+let silencedDNb = false;
+
+function updateInterventions() {
+  const silencedTypes: string[] = [];
+  if (silencedLC) silencedTypes.push("LC4", "LC6", "LPLC2");
+  if (silencedDNa) silencedTypes.push("DNa01", "DNa02");
+  if (silencedDNb) silencedTypes.push("DNb01", "GiantFiber");
+
+  game.fly.bridge.applyInterventions({
+    silencedTypes,
+    synapticGain: parseFloat(($("#slider-gain") as HTMLInputElement).value),
+    backgroundDrive: parseFloat(($("#slider-drive") as HTMLInputElement).value),
+  });
 }
-$("#settings-done").onclick = () => {
-  const changed =
-    $<HTMLSelectElement>("#camera-select").value !== settings.camera;
-  settings.camera = $<HTMLSelectElement>("#camera-select").value;
-  settings.difficulty = $<HTMLSelectElement>("#difficulty")
-    .value as typeof settings.difficulty;
-  settings.assist = $<HTMLSelectElement>("#assist")
-    .value as typeof settings.assist;
-  for (const key of ["sensitivity", "movement", "volume"] as const)
-    settings[key] = Number($<HTMLInputElement>(`#${key}`).value);
-  for (const key of ["preview", "debug"] as const)
-    settings[key] = $<HTMLInputElement>(`#${key}`).checked;
-  try {
-    localStorage.setItem("motion-settings", JSON.stringify(settings));
-  } catch {
-    showError(
-      "Settings could not be saved in this browser; they still apply for this session.",
-    );
-  }
-  audio.volume = settings.volume;
-  if (changed && mode === "camera" && camera.running) void startCamera();
-  else setScreen(settingsReturn === "settings" ? "home" : settingsReturn);
-};
-$("#play").onclick = () => void startCamera();
-$("#calibrate").onclick = () => void startCamera();
-$("#recalibrate").onclick = () => void startCamera();
-$("#home-settings").onclick = openSettings;
-$("#settings-open").onclick = openSettings;
-$("#keyboard").onclick = () => {
-  camera.stop();
-  mode = "keyboard";
+
+$("#silence-lc4").addEventListener("click", () => {
+  silencedLC = !silencedLC;
+  $("#silence-lc4").classList.toggle("silenced", silencedLC);
+  updateInterventions();
+});
+$("#silence-dna").addEventListener("click", () => {
+  silencedDNa = !silencedDNa;
+  $("#silence-dna").classList.toggle("silenced", silencedDNa);
+  updateInterventions();
+});
+$("#silence-dnb").addEventListener("click", () => {
+  silencedDNb = !silencedDNb;
+  $("#silence-dnb").classList.toggle("silenced", silencedDNb);
+  updateInterventions();
+});
+
+$("#slider-gain").addEventListener("input", (e) => {
+  const val = (e.target as HTMLInputElement).value;
+  $("#gain-val").textContent = `${parseFloat(val).toFixed(1)}x`;
+  updateInterventions();
+});
+$("#slider-drive").addEventListener("input", (e) => {
+  const val = (e.target as HTMLInputElement).value;
+  $("#drive-val").textContent = parseFloat(val).toFixed(1);
+  updateInterventions();
+});
+
+$("#btn-lab-reset").addEventListener("click", () => {
+  silencedLC = false;
+  silencedDNa = false;
+  silencedDNb = false;
+  $("#silence-lc4").classList.remove("silenced");
+  $("#silence-dna").classList.remove("silenced");
+  $("#silence-dnb").classList.remove("silenced");
+  ($("#slider-gain") as HTMLInputElement).value = "1.0";
+  ($("#slider-drive") as HTMLInputElement).value = "1.2";
+  $("#gain-val").textContent = "1.0x";
+  $("#drive-val").textContent = "1.2";
+  game.fly.bridge.reset();
+  updateInterventions();
+});
+
+// UI Navigation listeners
+$("#play").addEventListener("click", () => void startCamera());
+$("#calibrate").addEventListener("click", () => void startCamera());
+$("#keyboard").addEventListener("click", () => {
   audio.unlock();
-  audio.volume = settings.volume;
+  mode = "keyboard";
+  calibrated = true;
   startGame();
-};
-$("#synthetic").onclick = () => {
-  camera.stop();
+});
+$("#synthetic").addEventListener("click", () => {
+  audio.unlock();
   mode = "synthetic";
-  interpreter.reset();
-  interpreter.calibration = {
-    center: { x: 0.5, y: 0.5, z: 0 },
-    width: 0.22,
-    hand: "right",
-    range: 0.15,
-    reach: 1.8,
-  };
-  syntheticTime = 0;
-  settings.debug = true;
+  calibrated = true;
   startGame();
-};
-$("#pause").onclick = () => setScreen("pause-screen");
-$("#resume").onclick = () => {
-  interpreter.reset();
-  setScreen("game");
-};
-$("#restart").onclick = startGame;
-$("#play-again").onclick = startGame;
-for (const id of ["back-home", "results-home", "calibration-cancel"])
-  $(`#${id}`).onclick = home;
-$(".brand").onclick = (e) => {
-  e.preventDefault();
+});
+$("#pause").addEventListener("click", () => setScreen("pause-screen"));
+$("#resume").addEventListener("click", () => setScreen("game"));
+$("#restart").addEventListener("click", startGame);
+$("#recalibrate").addEventListener("click", () => void startCamera());
+$("#back-home").addEventListener("click", home);
+$("#calibration-cancel").addEventListener("click", home);
+$("#play-again").addEventListener("click", startGame);
+$("#results-home").addEventListener("click", home);
+$("#home-settings").addEventListener("click", openSettings);
+$("#settings-open").addEventListener("click", openSettings);
+$("#error-close").addEventListener("click", () =>
+  $("#error").classList.add("hidden"),
+);
+$("#quit").addEventListener("click", () => {
   home();
-};
-$("#quit").onclick = () => {
-  home();
-  toast("Camera released. You can safely close this tab.");
-};
-$("#error-close").onclick = () => $("#error").classList.add("hidden");
-function toast(message: string) {
-  $("#toast").textContent = message;
-  $("#toast").classList.remove("hidden");
-  toastUntil = performance.now() + 2200;
+  window.close();
+});
+
+let screenBeforeSettings = "home";
+
+function openSettings() {
+  screenBeforeSettings = screen;
+  $<HTMLSelectElement>("#opponent-type").value = settings.opponentType;
+  $<HTMLSelectElement>("#difficulty").value = settings.difficulty;
+  $<HTMLSelectElement>("#assist").value = settings.assist;
+  $<HTMLInputElement>("#sensitivity").value = String(settings.sensitivity);
+  $<HTMLInputElement>("#movement").value = String(settings.movement);
+  $<HTMLInputElement>("#volume").value = String(settings.volume);
+  $<HTMLInputElement>("#preview").checked = settings.preview;
+  $<HTMLInputElement>("#debug").checked = settings.debug;
+  void populateCameras();
+  setScreen("settings");
 }
+
+async function populateCameras() {
+  const select = $<HTMLSelectElement>("#camera-select");
+  const devices = await camera.devices();
+  select.innerHTML = '<option value="">Default camera</option>';
+  for (const device of devices) {
+    const opt = document.createElement("option");
+    opt.value = device.deviceId;
+    opt.textContent = device.label || `Camera ${select.options.length}`;
+    if (device.deviceId === settings.camera) opt.selected = true;
+    select.append(opt);
+  }
+}
+
+$("#settings-done").addEventListener("click", () => {
+  settings.opponentType = $<HTMLSelectElement>("#opponent-type").value as any;
+  settings.difficulty = $<HTMLSelectElement>("#difficulty").value as any;
+  settings.assist = $<HTMLSelectElement>("#assist").value as any;
+  settings.sensitivity = Number($<HTMLInputElement>("#sensitivity").value);
+  settings.movement = Number($<HTMLInputElement>("#movement").value);
+  settings.volume = Number($<HTMLInputElement>("#volume").value);
+  settings.preview = $<HTMLInputElement>("#preview").checked;
+  settings.debug = $<HTMLInputElement>("#debug").checked;
+  const newCamera = $<HTMLSelectElement>("#camera-select").value;
+  const cameraChanged = newCamera !== settings.camera;
+  settings.camera = newCamera;
+  localStorage.setItem("motion-settings", JSON.stringify(settings));
+  audio.volume = settings.volume;
+  game.settings = settings;
+  if (cameraChanged && camera.running) {
+    void startCamera();
+  } else {
+    setScreen(
+      screenBeforeSettings !== "settings"
+        ? screenBeforeSettings
+        : calibrated
+          ? "game"
+          : "home",
+    );
+  }
+});
+
 window.addEventListener("keydown", (e) => {
-  if ((e.target as HTMLElement).matches("input,select")) return;
-  if (e.code === "Escape") {
-    if (screen === "game") setScreen("pause-screen");
-    else if (screen === "pause-screen") setScreen("game");
-  }
-  if (e.code === "F3") {
-    e.preventDefault();
-    settings.debug = !settings.debug;
-  }
-  if (mode === "keyboard" && screen === "game") {
-    debug.keys.add(e.key);
-    if (e.code === "Space") {
-      e.preventDefault();
-      if (!e.repeat) {
-        debug.swing(performance.now());
-        audio.play("swing");
-      }
+  if (screen === "game" && mode === "keyboard") {
+    debug.keys.add(e.code);
+    if (
+      e.code === "Space" &&
+      game.state === "ready" &&
+      game.match.server === 0
+    ) {
+      game.hit(0, "serve");
     }
-    const intents = ["clear", "drive", "drop", "smash", "lift"] as const;
-    if (Number(e.key) >= 1 && Number(e.key) <= 5)
-      debug.intent = intents[Number(e.key) - 1];
   }
 });
-window.addEventListener("keyup", (e) => debug.keys.delete(e.key));
-window.addEventListener("blur", () => {
-  debug.keys.clear();
-  if (screen === "game") setScreen("pause-screen");
-});
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden && screen === "game") setScreen("pause-screen");
+window.addEventListener("keyup", (e) => {
+  if (screen === "game" && mode === "keyboard") {
+    debug.keys.delete(e.code);
+  }
 });
 window.addEventListener("beforeunload", () => camera.stop());
+
 const skeleton = $<HTMLCanvasElement>("#skeleton"),
   ctx = skeleton.getContext("2d")!;
 const edges = [
@@ -315,6 +537,7 @@ const edges = [
   [24, 26],
   [26, 28],
 ];
+
 function drawPose() {
   ctx.clearRect(0, 0, 640, 480);
   if (!lastPose) return;
@@ -361,12 +584,14 @@ function drawPose() {
     ctx.stroke();
   }
 }
+
 let uiClock = 0;
 function frame(now: number) {
   requestAnimationFrame(frame);
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
   fps = fps * 0.95 + (1 / Math.max(dt, 0.001)) * 0.05;
+
   if (screen === "game") {
     if (mode === "keyboard") game.setMotion(debug.update(now, dt));
     else if (mode === "synthetic") {
@@ -424,7 +649,17 @@ function frame(now: number) {
       setScreen("results");
     }
   }
+
   renderer.render(game, dt);
+
+  // Render Live Neural Visualization if panel is open
+  if (brainPanelOpen && brainRenderer) {
+    const tel = game.fly.getTelemetry();
+    if (tel) {
+      brainRenderer.render(tel);
+    }
+  }
+
   uiClock += dt;
   if (uiClock > 0.1) {
     uiClock = 0;
@@ -460,13 +695,23 @@ function frame(now: number) {
     $("#debug-overlay").classList.toggle("hidden", !settings.debug);
     if (settings.debug) {
       const m = game.motion;
+      const flyCmd = game.fly.lastMotorCommand;
       $("#debug-overlay").textContent =
-        `${mode.toUpperCase()} / ${m.state} (${game.footworkState})\nIntent: ${m.intentDirection.toUpperCase()} · lean ${m.lean.toFixed(2)} · weight ${m.intentWeight.toFixed(2)}\nAvatar: (${game.playerPos.x.toFixed(2)}, ${game.playerPos.z.toFixed(2)}) → Target: (${game.targetPos.x.toFixed(2)}, ${game.targetPos.z.toFixed(2)})\nEnvelope: ${C.contactEnvelope[settings.assist]}m · Window: ${C.timingWindow[settings.assist]}s\nRender ${fps.toFixed(0)} fps · camera ${camera.cameraFps.toFixed(0)} fps\nPose ${camera.poseFps.toFixed(0)} fps · inference ${camera.inferenceMs.toFixed(1)} ms\nCapture → result ${camera.latency.toFixed(1)} ms\nConfidence ${m.confidence.toFixed(2)} · hand ${interpreter.calibration.hand}\nSpeed ${m.speed.toFixed(2)} w/s · power ${m.power.toFixed(2)} · ${m.intent.toUpperCase()}\nSwing #${m.swingId} (${m.phase}) · used #${game.usedSwing} · primed ${game.primedSwing ? "#" + game.primedSwing.id : "none"}\nRacket (${game.racket.x.toFixed(2)}, ${game.racket.y.toFixed(2)}, ${game.racket.z.toFixed(2)})\nAI ${game.ai.state} · contacts ${game.totalHits}`;
+        `${mode.toUpperCase()} / ${m.state} (${game.footworkState})\n` +
+        `Intent: ${m.intentDirection.toUpperCase()} · lean ${m.lean.toFixed(2)} · weight ${m.intentWeight.toFixed(2)}\n` +
+        `Avatar: (${game.playerPos.x.toFixed(2)}, ${game.playerPos.z.toFixed(2)}) → Target: (${game.targetPos.x.toFixed(2)}, ${game.targetPos.z.toFixed(2)})\n` +
+        `Opponent: ${settings.opponentType.toUpperCase()} at (${game.opponentX.toFixed(2)}, ${game.opponentZ.toFixed(2)})\n` +
+        `Fly Motor: vx ${flyCmd.vx.toFixed(2)} | vz ${flyCmd.vz.toFixed(2)} | state ${flyCmd.flightState} | arousal ${(flyCmd.arousal * 100).toFixed(0)}%\n` +
+        `Confidence ${m.confidence.toFixed(2)} · Speed ${m.speed.toFixed(2)} w/s · ${m.intent.toUpperCase()}\n` +
+        `Swing #${m.swingId} (${m.phase}) · used #${game.usedSwing}\n` +
+        `Racket (${game.racket.x.toFixed(2)}, ${game.racket.y.toFixed(2)}, ${game.racket.z.toFixed(2)})\n` +
+        `Render ${fps.toFixed(0)} fps · camera ${camera.cameraFps.toFixed(0)} fps · pose ${camera.poseFps.toFixed(0)} fps`;
     }
   }
   if (now > toastUntil) $("#toast").classList.add("hidden");
 }
 requestAnimationFrame(frame);
+
 // Read-only diagnostics for browser acceptance tests and local tuning.
 Object.defineProperty(window, "motionDiagnostics", {
   get: () => ({
@@ -490,5 +735,9 @@ Object.defineProperty(window, "motionDiagnostics", {
     playerPos: { ...game.playerPos },
     targetPos: { ...game.targetPos },
     shuttle: { ...game.shuttle.p },
+    opponentType: settings.opponentType,
+    opponentPos: { x: game.opponentX, y: game.opponentY, z: game.opponentZ },
+    flyMotorCommand: { ...game.fly.lastMotorCommand },
+    brainPanelOpen,
   }),
 });

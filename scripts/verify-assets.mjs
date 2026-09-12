@@ -3,6 +3,13 @@ for (const path of [
   "public/models/pose_landmarker_lite.task",
   "public/wasm/vision_wasm_internal.wasm",
   "public/pose-worker.js",
+  "public/neural-worker.js",
+  "public/data/connectome/manifest.json",
+  "public/data/connectome/neurons.json",
+  "public/data/connectome/indptr.bin",
+  "public/data/connectome/indices.bin",
+  "public/data/connectome/weights.bin",
+  "public/data/connectome/signs.bin",
 ]) {
   try {
     await access(path);

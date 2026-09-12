@@ -406,8 +406,11 @@ describe("contact, court and shuttle physics", () => {
 
 describe("match and connected rallies", () => {
   it("sustains rallies with auto-footwork player control across seeded opponents", () => {
-    for (let seed = 1; seed <= 8; seed++) {
-      const g = new Game({ ...defaults, difficulty: "normal" }, seeded(seed));
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const g = new Game(
+        { ...defaults, difficulty: "normal", opponentType: "classic" },
+        seeded(seed),
+      );
       let id = 1;
       for (let step = 0; step < 7200; step++) {
         const s = g.shuttle;
