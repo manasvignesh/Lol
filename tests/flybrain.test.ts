@@ -755,24 +755,225 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       expect(returned).toBe(true);
     });
 
+    it("verifies embodiment mode propagates end-to-end from Game settings to EmbodimentAdapter", async () => {
+      const gameSci = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "scientific",
+      });
+      await gameSci.fly.init(false);
+      gameSci.step(1 / 120);
+      expect(gameSci.fly.bridge.getEngine()!.embodimentAdapter.mode).toBe(
+        "scientific",
+      );
+
+      const gameDemo = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "demo-assist",
+      });
+      await gameDemo.fly.init(false);
+      gameDemo.step(1 / 120);
+      expect(gameDemo.fly.bridge.getEngine()!.embodimentAdapter.mode).toBe(
+        "demo-assist",
+      );
+    });
+
+    it("verifies direct EmbodimentAdapter causal dependency: zero bio signals produce no pursuit or striking", () => {
+      const adapter = new EmbodimentAdapter();
+      const zeroBio = {
+        steeringTorque: 0,
+        forwardThrust: 0,
+        brakingDrive: 0,
+        turnImpulse: 0,
+        escapeActivation: 0,
+        locomotorDrive: 0,
+        flightState: "HOVER" as const,
+      };
+
+      const features = {
+        distance: 2.0,
+        azimuthDeg: 25,
+        elevationDeg: 10,
+        relativeSpeed: 12,
+        loomingRate: 0.08,
+        angularSizeDeg: 5,
+        retinalVelocityDegPerSec: 10,
+        isApproaching: true,
+        incomingTrajectoryThreat: 0.9,
+      };
+
+      let cmd = adapter.adapt(
+        zeroBio,
+        features,
+        0.016,
+        {
+          shuttlePos: [-1.2, 1.6, -2.5],
+          shuttleVel: [-2.0, -1.0, -10.0],
+          flyPos: [0, 1.4, -3.9],
+          flyHeading: 0,
+          time: 0.1,
+        },
+        "scientific",
+      );
+
+      for (let step = 0; step < 60; step++) {
+        cmd = adapter.adapt(
+          zeroBio,
+          features,
+          0.016,
+          {
+            shuttlePos: [-1.2, 1.6, -2.5 - step * 0.03],
+            shuttleVel: [-2.0, -1.0, -10.0],
+            flyPos: [0, 1.4, -3.9],
+            flyHeading: 0,
+            time: 0.1 + step * 0.016,
+          },
+          "scientific",
+        );
+      }
+
+      // Zero bio output must mean no pursuit movement and no swing trigger
+      expect(Math.abs(cmd.vx)).toBeLessThan(1e-4);
+      expect(Math.abs(cmd.vz)).toBeLessThan(1e-4);
+      expect(cmd.swingTriggered).toBe(false);
+      expect(cmd.racketState).not.toBe("PREPARE");
+      expect(cmd.racketState).not.toBe("STRIKE");
+
+      // Repeat with meaningful non-zero biological signals
+      const activeBio = {
+        steeringTorque: 0.45,
+        forwardThrust: 0.2,
+        brakingDrive: 0.5,
+        turnImpulse: 0.3,
+        escapeActivation: 0.6,
+        locomotorDrive: 0.7,
+        flightState: "PURSUIT" as const,
+      };
+
+      const activeAdapter = new EmbodimentAdapter();
+      let activeCmd = activeAdapter.adapt(
+        activeBio,
+        features,
+        0.016,
+        {
+          shuttlePos: [-1.2, 1.6, -2.5],
+          shuttleVel: [-2.0, -1.0, -10.0],
+          flyPos: [0, 1.4, -3.9],
+          flyHeading: 0,
+          time: 0.1,
+        },
+        "scientific",
+      );
+
+      for (let step = 0; step < 60; step++) {
+        activeCmd = activeAdapter.adapt(
+          activeBio,
+          features,
+          0.016,
+          {
+            shuttlePos: [-1.2, 1.6, -2.5 - step * 0.03],
+            shuttleVel: [-2.0, -1.0, -10.0],
+            flyPos: [0, 1.4, -3.9],
+            flyHeading: 0,
+            time: 0.1 + step * 0.016,
+          },
+          "scientific",
+        );
+      }
+
+      // Active bio signals produce significant lateral and longitudinal pursuit
+      expect(Math.abs(activeCmd.vx)).toBeGreaterThan(0.5);
+      expect(Math.abs(activeCmd.vz)).toBeGreaterThan(0.5);
+    });
+
+    it("verifies scientific mode applies stricter reach boundaries and neural thresholds than demo-assist", () => {
+      const adapterDemo = new EmbodimentAdapter();
+      adapterDemo.setMode("demo-assist");
+
+      const adapterSci = new EmbodimentAdapter();
+      adapterSci.setMode("scientific");
+
+      const modestBio = {
+        steeringTorque: 0.1,
+        forwardThrust: 0.1,
+        brakingDrive: 0.1,
+        turnImpulse: 0.1,
+        escapeActivation: 0.15,
+        locomotorDrive: 0.16, // Between demo threshold (0.12) and scientific threshold (0.22)
+        flightState: "HOVER" as const,
+      };
+
+      const features = {
+        distance: 2.5,
+        azimuthDeg: 0,
+        elevationDeg: 0,
+        relativeSpeed: 8,
+        loomingRate: 0.04,
+        angularSizeDeg: 3,
+        retinalVelocityDegPerSec: 5,
+        isApproaching: true,
+        incomingTrajectoryThreat: 0.6,
+      };
+
+      const sensory = {
+        shuttlePos: [0.3, 1.5, -2.0] as [number, number, number],
+        shuttleVel: [0, -0.5, -6.0] as [number, number, number],
+        flyPos: [0, 1.4, -3.9] as [number, number, number],
+        flyHeading: 0,
+        time: 0.2,
+      };
+
+      // Step 1: IDLE -> TRACKING
+      adapterDemo.adapt(modestBio, features, 0.016, sensory, "demo-assist");
+      adapterSci.adapt(modestBio, features, 0.016, sensory, "scientific");
+
+      // Step 2: Demo mode transitions TRACKING -> PREPARE with modest neural arousal (0.16 >= 0.12)
+      const cmdDemo = adapterDemo.adapt(
+        modestBio,
+        features,
+        0.016,
+        sensory,
+        "demo-assist",
+      );
+      expect(cmdDemo.racketState).toBe("PREPARE");
+
+      // Scientific mode stays in TRACKING because 0.16 < 0.22 threshold
+      const cmdSci = adapterSci.adapt(
+        modestBio,
+        features,
+        0.016,
+        sensory,
+        "scientific",
+      );
+      expect(cmdSci.racketState).toBe("TRACKING");
+    });
+
     it("verifies DNa02 descending neuron silencing selectively degrades lateral steering", async () => {
+      const seed = 42;
       const gameIntact = new Game({
         ...defaults,
         opponentType: "fruitfly",
         flyEmbodimentMode: "demo-assist",
       });
-      await gameIntact.fly.init(false);
+      await gameIntact.fly.init(false, "/data/connectome", seed);
       gameIntact.feedSyntheticShot("left");
+
       let intactClosestDist = 999;
+      let intactMinX = 0;
+
       for (let step = 0; step < 260; step++) {
         gameIntact.step(1 / 120);
+        if (gameIntact.fly.x < intactMinX) {
+          intactMinX = gameIntact.fly.x;
+        }
         if (gameIntact.currentShotDiagnostic) {
           intactClosestDist = Math.min(
             intactClosestDist,
             gameIntact.currentShotDiagnostic.closestDistance,
           );
         }
-        if (gameIntact.shuttle.lastHit === 1) break;
+        if (gameIntact.shuttle.lastHit === 1 || gameIntact.hits >= 2) break;
       }
 
       const gameAblated = new Game({
@@ -780,14 +981,20 @@ describe("Fruit-Fly Connectome Subsystem", () => {
         opponentType: "fruitfly",
         flyEmbodimentMode: "demo-assist",
       });
-      await gameAblated.fly.init(false);
+      await gameAblated.fly.init(false, "/data/connectome", seed);
       gameAblated.fly.bridge.applyInterventions({
         silencedTypes: ["DNa02"],
       });
       gameAblated.feedSyntheticShot("left");
+
       let ablatedClosestDist = 999;
+      let ablatedMinX = 0;
+
       for (let step = 0; step < 260; step++) {
         gameAblated.step(1 / 120);
+        if (gameAblated.fly.x < ablatedMinX) {
+          ablatedMinX = gameAblated.fly.x;
+        }
         if (gameAblated.currentShotDiagnostic) {
           ablatedClosestDist = Math.min(
             ablatedClosestDist,
@@ -797,8 +1004,9 @@ describe("Fruit-Fly Connectome Subsystem", () => {
         if (gameAblated.state === "point") break;
       }
 
-      // Silencing primary descending steering neuron DNa02 impairs lateral interception
-      expect(intactClosestDist).toBeLessThanOrEqual(ablatedClosestDist + 0.1);
+      // Intact fly steers significantly further laterally towards the left shot than DNa02-silenced fly
+      expect(Math.abs(intactMinX)).toBeGreaterThan(Math.abs(ablatedMinX));
+      expect(intactClosestDist).toBeLessThanOrEqual(ablatedClosestDist);
     });
 
     it("verifies Classic AI and Fruit-Fly Connectome produce fundamentally different mechanical outcomes", async () => {
@@ -809,7 +1017,7 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       gameClassic.feedSyntheticShot("left");
       let classicInteracted = false;
       for (let i = 0; i < 200; i++) {
-        gameClassic.step(1/120);
+        gameClassic.step(1 / 120);
         if (gameClassic.shuttle.lastHit === 1 || gameClassic.hits >= 2) {
           classicInteracted = true;
           break;
@@ -817,7 +1025,11 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       }
 
       // 2. Fruit Fly
-      const gameFly = new Game({ ...defaults, opponentType: "fruitfly", flyEmbodimentMode: "demo-assist" });
+      const gameFly = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "demo-assist",
+      });
       await gameFly.fly.init(false);
       gameFly.fly.x = 0;
       gameFly.fly.y = 1.4;
@@ -825,8 +1037,8 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       gameFly.feedSyntheticShot("left");
       let flyInteracted = false;
       for (let i = 0; i < 200; i++) {
-        gameFly.step(1/120);
-        if (gameFly.shuttle.lastHit === 1) {
+        gameFly.step(1 / 120);
+        if (gameFly.shuttle.lastHit === 1 || gameFly.hits >= 2) {
           flyInteracted = true;
           break;
         }
@@ -837,40 +1049,115 @@ describe("Fruit-Fly Connectome Subsystem", () => {
 
       const classicV = gameClassic.shuttle.velocity;
       const flyV = gameFly.shuttle.velocity;
-      
-      const vDiff = Math.abs(classicV.x - flyV.x) + Math.abs(classicV.y - flyV.y) + Math.abs(classicV.z - flyV.z);
+
+      const vDiff =
+        Math.abs(classicV.x - flyV.x) +
+        Math.abs(classicV.y - flyV.y) +
+        Math.abs(classicV.z - flyV.z);
       expect(vDiff).toBeGreaterThan(1.0); // Distinct mechanics
     });
 
+    it("verifies Classic AI and Fruit-Fly Connectome produce structurally distinct temporal trajectories", async () => {
+      // 1. Classic AI
+      const gameClassic = new Game({ ...defaults, opponentType: "classic" });
+      gameClassic.ai.x = 0;
+      gameClassic.ai.z = -3.9;
+      gameClassic.feedSyntheticShot("left");
+
+      const classicTrajectory: { t: number; x: number; z: number }[] = [];
+
+      for (let i = 0; i < 240; i++) {
+        gameClassic.step(1 / 120);
+        classicTrajectory.push({
+          t: gameClassic.time,
+          x: gameClassic.ai.x,
+          z: gameClassic.ai.z,
+        });
+        if (gameClassic.shuttle.lastHit === 1 || gameClassic.hits >= 2) break;
+      }
+
+      // 2. Fruit Fly
+      const gameFly = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "demo-assist",
+      });
+      await gameFly.fly.init(false);
+      gameFly.fly.x = 0;
+      gameFly.fly.y = 1.4;
+      gameFly.fly.z = -3.9;
+      gameFly.feedSyntheticShot("left");
+
+      const flyTrajectory: {
+        t: number;
+        x: number;
+        z: number;
+        rx: number;
+        ry: number;
+        rz: number;
+      }[] = [];
+
+      for (let i = 0; i < 240; i++) {
+        gameFly.step(1 / 120);
+        flyTrajectory.push({
+          t: gameFly.time,
+          x: gameFly.fly.x,
+          z: gameFly.fly.z,
+          rx: gameFly.fly.racketPos.x,
+          ry: gameFly.fly.racketPos.y,
+          rz: gameFly.fly.racketPos.z,
+        });
+        if (gameFly.shuttle.lastHit === 1 || gameFly.hits >= 2) break;
+      }
+
+      expect(classicTrajectory.length).toBeGreaterThan(10);
+      expect(flyTrajectory.length).toBeGreaterThan(10);
+
+      const sampleStep =
+        Math.min(classicTrajectory.length, flyTrajectory.length) - 5;
+      const xDiff = Math.abs(
+        classicTrajectory[sampleStep].x - flyTrajectory[sampleStep].x,
+      );
+      const zDiff = Math.abs(
+        classicTrajectory[sampleStep].z - flyTrajectory[sampleStep].z,
+      );
+
+      expect(xDiff + zDiff).toBeGreaterThan(0.2);
+    });
+
     it("verifies the fruit fly does not chase the shuttle if neural output is zeroed out", async () => {
-      const game = new Game({ ...defaults, opponentType: "fruitfly", flyEmbodimentMode: "scientific" });
+      const game = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "scientific",
+      });
       await game.fly.init(false);
-      
+
       game.feedSyntheticShot("left");
-      
+
       const originalUpdate = game.fly.bridge.update.bind(game.fly.bridge);
       game.fly.bridge.update = (dt, input) => {
-         const motor = originalUpdate(dt, input);
-         motor.steerTorque = 0;
-         motor.vx = 0;
-         motor.vz = 0;
-         if (motor.biological) {
-           motor.biological.forwardThrust = 0;
-           motor.biological.brakingDrive = 0;
-           motor.biological.escapeActivation = 0;
-           motor.biological.locomotorDrive = 0;
-           motor.biological.turnImpulse = 0;
-         }
-         return motor;
+        const motor = originalUpdate(dt, input);
+        motor.steerTorque = 0;
+        motor.vx = 0;
+        motor.vz = 0;
+        if (motor.biological) {
+          motor.biological.forwardThrust = 0;
+          motor.biological.brakingDrive = 0;
+          motor.biological.escapeActivation = 0;
+          motor.biological.locomotorDrive = 0;
+          motor.biological.turnImpulse = 0;
+        }
+        return motor;
       };
 
       for (let i = 0; i < 200; i++) {
-        game.step(1/120);
+        game.step(1 / 120);
       }
 
       // Fly should not have moved significantly
       expect(Math.abs(game.fly.x)).toBeLessThan(0.01);
-      expect(Math.abs(game.fly.z - (-3.9))).toBeLessThan(0.01);
+      expect(Math.abs(game.fly.z - -3.9)).toBeLessThan(0.01);
     });
   });
 });

@@ -55,6 +55,13 @@ self.onmessage = async (e: MessageEvent) => {
       break;
     }
 
+    case "SET_MODE": {
+      if (engine && payload) {
+        engine.setEmbodimentMode(payload);
+      }
+      break;
+    }
+
     case "RESET": {
       if (engine) engine.reset();
       break;

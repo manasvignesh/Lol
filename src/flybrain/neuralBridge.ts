@@ -100,7 +100,23 @@ export class NeuralBridge {
     return this.localEngine;
   }
 
-  update(dtSec: number, sensoryInput: FlySensoryInput): FlyMotorCommand {
+  setEmbodimentMode(mode: "demo-assist" | "scientific") {
+    if (this.localEngine) {
+      this.localEngine.setEmbodimentMode(mode);
+    }
+    if (this.worker) {
+      this.worker.postMessage({ type: "SET_MODE", payload: mode });
+    }
+  }
+
+  update(
+    dtSec: number,
+    sensoryInput: FlySensoryInput,
+    mode?: "demo-assist" | "scientific",
+  ): FlyMotorCommand {
+    if (mode) {
+      this.setEmbodimentMode(mode);
+    }
     if (!this.isReady || !this.localEngine) {
       return this.currentMotorCommand;
     }
@@ -111,7 +127,7 @@ export class NeuralBridge {
       return this.currentMotorCommand;
     } else {
       // Step local engine directly
-      const cmd = this.localEngine.update(dtSec, sensoryInput);
+      const cmd = this.localEngine.update(dtSec, sensoryInput, mode);
       this.currentMotorCommand = cmd;
       this.currentTelemetry = this.localEngine.getTelemetry();
       return cmd;

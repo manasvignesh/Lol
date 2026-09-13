@@ -52,6 +52,10 @@ export class FlyOpponent {
     this.bridge.reset();
   }
 
+  setEmbodimentMode(mode: "demo-assist" | "scientific") {
+    this.bridge.setEmbodimentMode(mode);
+  }
+
   update(
     dt: number,
     shuttle: Shuttle,
@@ -71,7 +75,11 @@ export class FlyOpponent {
     };
 
     // Update connectome neural dynamics
-    const motor = this.bridge.update(dt, sensoryInput);
+    const motor = this.bridge.update(
+      dt,
+      sensoryInput,
+      settings.flyEmbodimentMode,
+    );
     this.lastMotorCommand = motor;
 
     if (motor.swingTriggered) {

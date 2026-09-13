@@ -250,6 +250,7 @@ export class NeuralEngine {
       features,
       dt * 0.001,
       sensoryInput,
+      this.embodimentAdapter.mode,
     );
     this.lastMotorCommand = motorCommand;
 
@@ -259,10 +260,21 @@ export class NeuralEngine {
     return motorCommand;
   }
 
+  setEmbodimentMode(mode: "demo-assist" | "scientific") {
+    this.embodimentAdapter.setMode(mode);
+  }
+
   /**
    * Advance simulation for a specified delta time (in seconds).
    */
-  update(dtSec: number, sensoryInput?: FlySensoryInput): FlyMotorCommand {
+  update(
+    dtSec: number,
+    sensoryInput?: FlySensoryInput,
+    mode?: "demo-assist" | "scientific",
+  ): FlyMotorCommand {
+    if (mode) {
+      this.setEmbodimentMode(mode);
+    }
     const targetDtMs = dtSec * 1000;
     const stepDtMs = this.params.dt;
     const steps = Math.max(1, Math.round(targetDtMs / stepDtMs));

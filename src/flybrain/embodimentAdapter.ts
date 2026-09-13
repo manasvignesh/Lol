@@ -54,6 +54,10 @@ export class EmbodimentAdapter {
   // Operating Mode ("demo-assist" vs "scientific")
   public mode: "demo-assist" | "scientific" = "demo-assist";
 
+  setMode(mode: "demo-assist" | "scientific") {
+    this.mode = mode;
+  }
+
   /**
    * Adapts biological motor signals into court velocity and procedural racket movement.
    */
@@ -65,12 +69,14 @@ export class EmbodimentAdapter {
     mode: "demo-assist" | "scientific" = this.mode,
   ): FlyMotorCommand {
     this.mode = mode;
+    const isDemo = mode === "demo-assist";
 
     // 1. Biological Flight Velocity Mapping (Derived from MaleCNS Descending Neurons)
-    // Steering torque (-1..1) maps to lateral velocity (-2.85..2.85 m/s)
-    const targetVx = bio.steeringTorque * 2.85;
+    // Lateral velocity strictly derived from steering torque (DNa01/DNa02)
+    const lateralScale = isDemo ? 2.85 : 2.4;
+    const targetVx = bio.steeringTorque * lateralScale;
 
-    // Smooth velocities with aerodynamic flight inertia
+    // Smooth lateral velocity with flight inertia
     const smoothing = Math.min(1.0, dt * 10.0);
     this.smoothedVx += (targetVx - this.smoothedVx) * smoothing;
 
@@ -78,7 +84,7 @@ export class EmbodimentAdapter {
     this.smoothedArousal +=
       (bio.locomotorDrive - this.smoothedArousal) * Math.min(1.0, dt * 6.0);
 
-    // 2. Lightweight Physical Interception Estimation (For Artificial Racket Effector)
+    // 2. Short-Horizon Effector Estimation (Local 100-240ms lookahead for artificial racket)
     let ttc = 99.0;
     let contactPoint: [number, number, number] = [0, 1.4, -3.55];
 
@@ -91,102 +97,61 @@ export class EmbodimentAdapter {
       const [vx, vy, vz] = sensoryInput.shuttleVel;
 
       if (vz < -0.3 && sz > flyZ - 1.2) {
-        // Forward numerical simulation of parabolic shuttle path with gravity and aerodynamic drag
-        let simX = sx;
-        let simY = sy;
-        let simZ = sz;
-        let simVx = vx;
-        let simVy = vy;
-        let simVz = vz;
-        const drag = 0.095;
-        const gravity = 9.81;
-        const simDt = 0.016;
+        const distZ = sz - (flyZ + 0.35);
+        const rawTtc = distZ / Math.max(0.5, Math.abs(vz));
+        ttc = Math.max(0.04, rawTtc);
 
-        let bestTtc = 99.0;
-        let bestPoint: [number, number, number] = [flyX, flyY + 0.1, flyZ + 0.35];
-        let minScore = 9999;
+        // Local short-horizon projection (100-240ms) without globally searching future ideal strike points
+        const lookahead = Math.max(0.08, Math.min(isDemo ? 0.24 : 0.18, ttc));
+        const estX = sx + vx * lookahead;
+        const estY = Math.max(
+          0.2,
+          sy + vy * lookahead - 0.5 * 9.81 * lookahead * lookahead,
+        );
+        const estZ = sz + vz * lookahead;
 
-        // Check if trajectory reaches a high apex (> 2.4m)
-        let isHighArc = false;
-        {
-          let testY = sy;
-          let testVy = vy;
-          for (let s = 1; s <= 60; s++) {
-            testVy -= gravity * simDt;
-            testY += testVy * simDt;
-            if (testY > 2.45) {
-              isHighArc = true;
-              break;
-            }
-          }
-        }
-
-        for (let step = 1; step <= 140; step++) {
-          const t = step * simDt;
-          const spd = Math.sqrt(simVx * simVx + simVy * simVy + simVz * simVz);
-          const dragFactor = 1.0 / (1.0 + drag * spd * simDt);
-          simVx *= dragFactor;
-          simVy = (simVy - gravity * simDt) * dragFactor;
-          simVz *= dragFactor;
-
-          simX += simVx * simDt;
-          simY += simVy * simDt;
-          simZ += simVz * simDt;
-
-          if (simY < 0.15) break; // Shuttle grounded
-
-          if (isHighArc && simVy > 0.1) continue;
-
-          if (simZ <= 0.2 && simZ >= -6.5 && simY >= 0.35 && simY <= 2.45) {
-            const heightCost = Math.abs(simY - 1.45);
-            const score = heightCost * 2.8 + t * 0.15;
-
-            if (score < minScore) {
-              minScore = score;
-              bestTtc = t;
-              bestPoint = [simX, simY, simZ];
-            }
-          }
-        }
-
-        if (bestTtc < 90) {
-          ttc = bestTtc;
-          contactPoint = bestPoint;
-        } else {
-          const distZ = sz - (flyZ + 0.35);
-          ttc = Math.max(0.04, distZ / Math.max(0.5, Math.abs(vz)));
-          contactPoint = [sx, Math.max(0.4, sy), flyZ + 0.35];
-        }
+        contactPoint = [estX, estY, estZ];
       } else {
         contactPoint = [flyX, flyY + 0.1, flyZ + 0.35];
       }
     }
 
-    // Longitudinal velocity mapping: Biological signals primarily drive movement
+    // Longitudinal velocity mapping: Biological signals strictly define movement magnitude
     let targetVz = 0;
     if (sensoryInput && sensoryInput.shuttleVel[2] < -0.3) {
-      const isDeepShot = contactPoint[2] < flyZ - 0.5;
+      const [sx, sy, sz] = sensoryInput.shuttlePos;
+      const [vx, vy, vz] = sensoryInput.shuttleVel;
 
-      const neuralThrust = bio.forwardThrust * 1.5 + bio.locomotorDrive * 1.0;
-      const neuralBrake = bio.brakingDrive * 2.0;
-      const neuralEscape = bio.escapeActivation * 2.5;
+      // Closed-form projectile depth estimate: how deep will the incoming shot land?
+      const tFlight =
+        (vy + Math.sqrt(Math.max(0.01, vy * vy + 19.62 * Math.max(0.1, sy)))) /
+        9.81;
+      const estLandingZ = sz + vz * tFlight * 0.72;
 
-      const biologicalMagnitude = Math.max(0.3, neuralBrake + neuralEscape + bio.locomotorDrive);
-      const forwardMagnitude = Math.max(0.3, neuralThrust + bio.locomotorDrive);
+      // Geometry only signals whether the shuttle is landing deep behind the fly
+      const isDeepShot =
+        estLandingZ < flyZ - 0.2 || contactPoint[2] < flyZ - 0.3;
+
+      const neuralRetreatDrive =
+        bio.brakingDrive * 2.2 +
+        bio.escapeActivation * 2.5 +
+        bio.locomotorDrive * 2.5;
+      const neuralAdvanceDrive =
+        bio.forwardThrust * 1.8 + bio.locomotorDrive * 1.6;
 
       if (isDeepShot && sensoryInput.shuttleVel[2] < -1.0) {
-        // Retreating backwards
-        targetVz = -biologicalMagnitude * 4.0;
+        // Retreating backwards: purely scaled by biological retreat/escape drive
+        targetVz = -neuralRetreatDrive * (isDemo ? 1.5 : 1.2);
       } else {
-        // Advancing forward
-        targetVz = forwardMagnitude * 2.5;
+        // Advancing forward: purely scaled by biological thrust/locomotor drive
+        targetVz = neuralAdvanceDrive * (isDemo ? 1.3 : 1.0);
       }
     } else {
-      // Baseline hover / idle positioning
+      // Baseline hover / idle positioning: strictly neural
       targetVz = bio.forwardThrust * 0.4 - bio.brakingDrive * 0.4;
     }
 
-    const maxSpeedLimit = mode === "demo-assist" ? 3.8 : 3.2;
+    const maxSpeedLimit = isDemo ? 3.8 : 3.2;
     targetVz = Math.max(-maxSpeedLimit, Math.min(maxSpeedLimit, targetVz));
     this.smoothedVz += (targetVz - this.smoothedVz) * smoothing;
 
@@ -196,15 +161,15 @@ export class EmbodimentAdapter {
     }
 
     // 3. Embodiment Thresholds
-    const isDemo = mode === "demo-assist";
     const prepWindow = isDemo ? 0.85 : 0.55; // Time-to-contact window for racket preparation
-    const prepThreshold = isDemo ? 0.14 : 0.22; // Minimum neural locomotor readiness to start preparing
+    const prepThreshold = isDemo ? 0.12 : 0.22; // Minimum neural locomotor readiness to start preparing
     const strikeWindow = isDemo ? 0.26 : 0.17; // Time-to-contact window for initiating strike
-    const strikeThreshold = isDemo ? 0.26 : 0.38; // Motor impulse burst threshold
+    const strikeThreshold = isDemo ? 0.24 : 0.36; // Motor impulse burst threshold
     const maxImpulse = Math.max(
       bio.escapeActivation,
       bio.turnImpulse,
       bio.locomotorDrive,
+      bio.forwardThrust,
     );
 
     let swingTriggered = false;
@@ -254,10 +219,15 @@ export class EmbodimentAdapter {
         this.currentRacketVel = [0, 0, 0];
 
         // Transition to PREPARE if shuttle is approaching, in time window, and neural readiness is active
+        const hasNeuralPrepDrive =
+          bio.locomotorDrive >= prepThreshold ||
+          bio.forwardThrust >= prepThreshold ||
+          bio.escapeActivation >= prepThreshold;
+
         if (
           !this.hasSwungThisShot &&
           ttc <= prepWindow &&
-          bio.locomotorDrive >= prepThreshold &&
+          hasNeuralPrepDrive &&
           sensoryInput &&
           sensoryInput.shuttleVel[2] < -0.4
         ) {
@@ -321,9 +291,12 @@ export class EmbodimentAdapter {
         const prevRy = this.currentRacketPos[1];
         const prevRz = this.currentRacketPos[2];
 
-        this.currentRacketPos[0] += (prepX - this.currentRacketPos[0]) * Math.min(1.0, dt * prepSpeed);
-        this.currentRacketPos[1] += (prepY - this.currentRacketPos[1]) * Math.min(1.0, dt * prepSpeed);
-        this.currentRacketPos[2] += (prepZ - this.currentRacketPos[2]) * Math.min(1.0, dt * prepSpeed);
+        this.currentRacketPos[0] +=
+          (prepX - this.currentRacketPos[0]) * Math.min(1.0, dt * prepSpeed);
+        this.currentRacketPos[1] +=
+          (prepY - this.currentRacketPos[1]) * Math.min(1.0, dt * prepSpeed);
+        this.currentRacketPos[2] +=
+          (prepZ - this.currentRacketPos[2]) * Math.min(1.0, dt * prepSpeed);
 
         this.currentRacketVel = [
           (this.currentRacketPos[0] - prevRx) / Math.max(0.001, dt),
@@ -332,17 +305,23 @@ export class EmbodimentAdapter {
         ];
 
         // Trigger STRIKE when approaching contact window, high motor burst, or fast projectile reflex
-        const isFastSpeed = sensoryInput ? Math.abs(sensoryInput.shuttleVel[2]) > 14.0 : false;
+        const isFastSpeed = sensoryInput
+          ? Math.abs(sensoryInput.shuttleVel[2]) > 14.0
+          : false;
         const effectiveStrikeWindow = isFastSpeed ? 0.17 : isDemo ? 0.22 : 0.16;
 
-        const inLongitudinalReach = sensoryInput ? sensoryInput.shuttlePos[2] <= flyZ + 1.9 : true;
+        const inLongitudinalReach = sensoryInput
+          ? sensoryInput.shuttlePos[2] <= flyZ + 1.9
+          : true;
+        const hasNeuralStrikeDrive = maxImpulse >= (isDemo ? 0.14 : 0.24);
 
         const shouldStrike =
           !this.hasSwungThisShot &&
           inLongitudinalReach &&
+          hasNeuralStrikeDrive &&
           (ttc <= effectiveStrikeWindow ||
             (maxImpulse >= strikeThreshold && ttc <= 0.26) ||
-            (isFastSpeed && ttc <= 0.22 && bio.locomotorDrive >= prepThreshold));
+            (isFastSpeed && ttc <= 0.22));
 
         if (shouldStrike) {
           this.racketState = "STRIKE";
@@ -361,7 +340,11 @@ export class EmbodimentAdapter {
           } else {
             this.strokeP2 = [reachX - 0.4, reachY + 0.15, reachZ + 0.4];
           }
-        } else if (sensoryInput && (sensoryInput.shuttleVel[2] >= 0 || sensoryInput.shuttlePos[2] < flyZ - 0.8)) {
+        } else if (
+          sensoryInput &&
+          (sensoryInput.shuttleVel[2] >= 0 ||
+            sensoryInput.shuttlePos[2] < flyZ - 0.8)
+        ) {
           this.racketState = "RECOVER";
           this.cooldownTimer = 0.2;
         }

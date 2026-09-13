@@ -445,25 +445,33 @@ describe("match and connected rallies", () => {
 
   it("proves the human can mechanically win a point against both opponents", () => {
     // 1. Classic AI (Fast drop shot away from AI)
-    const gClassic = new Game({ ...defaults, difficulty: "normal", opponentType: "classic" });
-    
+    const gClassic = new Game({
+      ...defaults,
+      difficulty: "normal",
+      opponentType: "classic",
+    });
+
     // Human hits a fast shot to the extreme left corner
-    gClassic.feedSyntheticShot("fast", { targetOffset: { x: -1.7 } }); 
+    gClassic.feedSyntheticShot("fast", { targetOffset: { x: -1.7 } });
     // Target becomes x = -2.5 (inside 2.59 bounds). AI is at x=0.
-    
+
     // Let the rally play out
     for (let i = 0; i < 300; i++) gClassic.step(C.dt);
-    
+
     // AI shouldn't reach it, shuttle hits ground inside bounds
     // Note: state might be "point" or already transitioned back to "ready" after 1.7s
     expect(gClassic.match.score[0]).toBe(1); // Human scored
 
     // 2. Fruit-Fly Connectome
-    const gFly = new Game({ ...defaults, opponentType: "fruitfly", flyEmbodimentMode: "demo-assist" });
+    const gFly = new Game({
+      ...defaults,
+      opponentType: "fruitfly",
+      flyEmbodimentMode: "demo-assist",
+    });
     gFly.feedSyntheticShot("fast", { targetOffset: { x: -1.7 } });
-    
+
     for (let i = 0; i < 300; i++) gFly.step(C.dt);
-    
+
     expect(gFly.match.score[0]).toBe(1); // Human scored
   });
 
