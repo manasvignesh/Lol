@@ -157,7 +157,7 @@ export type EmbodimentRacketState =
   | "RECOVER";
 
 export interface FlyMotorCommand {
-  // Pure biological decoding
+  // Connectome-constrained decoding
   biological?: BiologicalMotorSignals;
   // Engineered badminton embodiment variables
   vx: number; // Lateral target velocity (-2.5 to 2.5 m/s)

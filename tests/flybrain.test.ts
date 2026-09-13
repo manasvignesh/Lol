@@ -727,6 +727,10 @@ describe("Fruit-Fly Connectome Subsystem", () => {
         flyEmbodimentMode: "demo-assist",
       });
       await game.fly.init(false);
+      game.fly.x = 0;
+      game.fly.y = 1.4;
+      game.fly.z = -3.9;
+      game.fly.bridge.reset();
 
       const initialFlyZ = game.fly.z; // -3.9
       game.feedSyntheticShot("deep");
@@ -795,6 +799,78 @@ describe("Fruit-Fly Connectome Subsystem", () => {
 
       // Silencing primary descending steering neuron DNa02 impairs lateral interception
       expect(intactClosestDist).toBeLessThanOrEqual(ablatedClosestDist + 0.1);
+    });
+
+    it("verifies Classic AI and Fruit-Fly Connectome produce fundamentally different mechanical outcomes", async () => {
+      // 1. Classic AI
+      const gameClassic = new Game({ ...defaults, opponentType: "classic" });
+      gameClassic.ai.x = 0;
+      gameClassic.ai.z = -3.9;
+      gameClassic.feedSyntheticShot("left");
+      let classicInteracted = false;
+      for (let i = 0; i < 200; i++) {
+        gameClassic.step(1/120);
+        if (gameClassic.shuttle.lastHit === 1 || gameClassic.hits >= 2) {
+          classicInteracted = true;
+          break;
+        }
+      }
+
+      // 2. Fruit Fly
+      const gameFly = new Game({ ...defaults, opponentType: "fruitfly", flyEmbodimentMode: "demo-assist" });
+      await gameFly.fly.init(false);
+      gameFly.fly.x = 0;
+      gameFly.fly.y = 1.4;
+      gameFly.fly.z = -3.9;
+      gameFly.feedSyntheticShot("left");
+      let flyInteracted = false;
+      for (let i = 0; i < 200; i++) {
+        gameFly.step(1/120);
+        if (gameFly.shuttle.lastHit === 1) {
+          flyInteracted = true;
+          break;
+        }
+      }
+
+      expect(classicInteracted).toBe(true);
+      expect(flyInteracted).toBe(true);
+
+      const classicV = gameClassic.shuttle.velocity;
+      const flyV = gameFly.shuttle.velocity;
+      
+      const vDiff = Math.abs(classicV.x - flyV.x) + Math.abs(classicV.y - flyV.y) + Math.abs(classicV.z - flyV.z);
+      expect(vDiff).toBeGreaterThan(1.0); // Distinct mechanics
+    });
+
+    it("verifies the fruit fly does not chase the shuttle if neural output is zeroed out", async () => {
+      const game = new Game({ ...defaults, opponentType: "fruitfly", flyEmbodimentMode: "scientific" });
+      await game.fly.init(false);
+      
+      game.feedSyntheticShot("left");
+      
+      const originalUpdate = game.fly.bridge.update.bind(game.fly.bridge);
+      game.fly.bridge.update = (dt, input) => {
+         const motor = originalUpdate(dt, input);
+         motor.steerTorque = 0;
+         motor.vx = 0;
+         motor.vz = 0;
+         if (motor.biological) {
+           motor.biological.forwardThrust = 0;
+           motor.biological.brakingDrive = 0;
+           motor.biological.escapeActivation = 0;
+           motor.biological.locomotorDrive = 0;
+           motor.biological.turnImpulse = 0;
+         }
+         return motor;
+      };
+
+      for (let i = 0; i < 200; i++) {
+        game.step(1/120);
+      }
+
+      // Fly should not have moved significantly
+      expect(Math.abs(game.fly.x)).toBeLessThan(0.01);
+      expect(Math.abs(game.fly.z - (-3.9))).toBeLessThan(0.01);
     });
   });
 });

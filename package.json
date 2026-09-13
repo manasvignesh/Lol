@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "node scripts/build-worker.mjs",
-    "prebuild": "node scripts/build-worker.mjs && node scripts/verify-assets.mjs",
+    "prebuild": "node scripts/setup-assets.mjs && node scripts/verify-assets.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",

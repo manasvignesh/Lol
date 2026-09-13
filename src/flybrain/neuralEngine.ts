@@ -241,7 +241,7 @@ export class NeuralEngine {
       this.iExt[i] = 0;
     }
 
-    // 5. Pure biological motor decoding from MaleCNS descending firing rates
+    // 5. Connectome-constrained motor decoding from MaleCNS descending firing rates
     const bioSignals = this.motorDecoder.decode(this.firingRates);
 
     // 6. Virtual badminton embodiment adaptation

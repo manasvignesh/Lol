@@ -639,14 +639,6 @@ export class Game {
           
           quality = clamp(quality, 0.1, 1);
 
-          // Natural Physical Misses on Casual
-          if (this.settings.flyEmbodimentMode !== "scientific") {
-              const missChance = (1 - quality) * 0.45;
-              if (this.random() < missChance) {
-                  // Let the shuttle pass; physical miss
-                  return;
-              }
-          }
 
           if (this.currentShotDiagnostic) {
             this.currentShotDiagnostic.result = "HIT";
@@ -678,15 +670,22 @@ export class Game {
             }
           }
 
-          const hitIntent: Intent =
-            flyMotor?.swingType === "overhead"
-              ? "smash"
-              : flyMotor?.swingType === "lift"
-                ? "lift"
-                : flyMotor?.swingType === "backhand"
-                  ? "drive"
-                  : "clear";
-          this.hit(1, hitIntent, quality);
+          // Calculate explicit physical outgoing velocity from racket state
+          const racketVel = flyMotor.targetRacketVel || [0, 0, 0];
+          const powerLevel = flyMotor.swingPower || 0.5;
+          const baseVz = 10 + powerLevel * 14; 
+          
+          let vx = racketVel[0] * 0.4 + (this.fly.x * -1.5) + (this.random() - 0.5) * (1 - quality) * 5;
+          let vy = 4 + racketVel[1] * 0.4 + powerLevel * 6;
+          let vz = Math.max(8, baseVz + racketVel[2] * 0.3) + (this.random() - 0.5) * (1 - quality) * 5;
+          
+          if (this.settings.assist === "beginner" && this.totalHits < 6) {
+             vz *= 0.8; 
+             vy += 2.0;
+          }
+          
+          const outVelocity = v(vx, vy, vz);
+          this.hit(1, outVelocity, quality);
         }
       }
     } else {
@@ -743,117 +742,83 @@ export class Game {
     }
   }
 
-  hit(side: 0 | 1, intent: Intent | "serve", quality: number = 1.0) {
+  hit(side: 0 | 1, intentOrVelocity: Intent | "serve" | V3, quality: number = 1.0) {
     const s = this.shuttle;
     const incomingSpeed = len(s.velocity);
-    const timing = side === 0 ? clamp((this.racket.z - s.p.z) / 1.1, -1, 1) : 0;
-    let power = 0.55;
-    const sign = side === 0 ? -1 : 1;
+    let velocity: V3;
+    let intentStr = "HIT";
+    let intent: Intent | "serve" = "clear";
 
-    const depth = intent === "drop" ? 2.8 : intent === "smash" ? 4.2 : 5.1;
-
-    // Directional aim from swing direction and body intent
-    let aim = 0;
-    if (side === 0) {
-      // With Z correctly mapped in motion.ts, direction.x is purely lateral intent
-      aim =
-        this.motion.direction.x * 2.2 + this.playerPos.x * 0.15 + timing * 0.2;
-
-      if (this.motion.intentDirection === "left") aim -= 0.6;
-      else if (this.motion.intentDirection === "right") aim += 0.6;
-
-      aim = clamp(aim, -2.5, 2.5);
-
-      if (this.settings.assist === "beginner") {
-        // Soft clamp the trajectory towards the center of the court (±1.5)
-        // while preserving the intent (left or right)
-        if (aim > 1.5) aim = 1.5 + (aim - 1.5) * 0.3; // dampen extreme right
-        if (aim < -1.5) aim = -1.5 + (aim + 1.5) * 0.3; // dampen extreme left
-      }
-
-      power = clamp(
-        this.motion.power * 0.95 +
-          incomingSpeed / 130 -
-          Math.abs(timing) * 0.05,
-        0.18,
-        1,
-      );
-      this.fly.swingAttempted = false;
-
-      // Start new diagnostic tracker for incoming shot toward fly
-      this.shotCount++;
-      this.currentShotDiagnostic = {
-        shotId: this.shotCount,
-        scenario: intent === "serve" ? "SERVE" : intent.toUpperCase(),
-        visualOnsetTime: 0,
-        motorOnsetTime: 0,
-        prepareTime: 0,
-        strikeTime: 0,
-        predictedContactTime: 0,
-        closestDistance: 999,
-        closestTime: 0,
-        racketAtClosest: [
-          this.fly.racketPos.x,
-          this.fly.racketPos.y,
-          this.fly.racketPos.z,
-        ],
-        shuttleAtClosest: [s.p.x, s.p.y, s.p.z],
-        flyAtClosest: [this.fly.x, this.fly.y, this.fly.z],
-        result: "MISS",
-        racketStateAtClosest: "IDLE",
-        neuralReadiness: this.fly.lastMotorCommand?.arousal ?? 0.2,
-        mode: this.settings.flyEmbodimentMode,
-      };
-    } else if (this.settings.opponentType === "fruitfly") {
-      // Engineered Embodiment: Outgoing direction derived from physical racket contact point,
-      // steering torque, and neural descending power without Classic AI heuristics
-      const contactOffsetX = s.p.x - this.fly.racketPos.x;
-      const flyMotor = this.fly.lastMotorCommand;
-      aim = clamp(
-        contactOffsetX * 2.2 +
-          (flyMotor.steerTorque || 0) * 0.8 +
-          this.fly.x * 0.15,
-        -2.0,
-        2.0,
-      );
-      power = clamp(flyMotor.swingPower || 0.55, 0.35, 0.9);
-      // Gentle first rallies: reduce power (increases float time) for first few hits if on Casual
-      if (this.settings.assist === "beginner" && this.totalHits < 6) {
-        const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
-        power *= handicap;
-      }
+    if (typeof intentOrVelocity === "object") {
+      // Direct physics-driven hit (Fruit-Fly)
+      velocity = intentOrVelocity;
     } else {
-      // Classic AI heuristic aiming
-      aim = clamp(
-        -this.playerPos.x * 0.25 + (this.random() - 0.5) * 2.5,
-        -1.8,
-        1.8,
-      );
-      power = 0.55;
-      if (this.settings.assist === "beginner" && this.totalHits < 6) {
-        const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
-        power *= handicap;
+      // Heuristic aim (Classic AI & Human)
+      intent = intentOrVelocity as Intent | "serve";
+      intentStr = intent.toUpperCase();
+      const timing = side === 0 ? clamp((this.racket.z - s.p.z) / 1.1, -1, 1) : 0;
+      let power = 0.55;
+      const sign = side === 0 ? -1 : 1;
+
+      const depth = intent === "drop" ? 2.8 : intent === "smash" ? 4.2 : 5.1;
+
+      let aim = 0;
+      if (side === 0) {
+        aim = this.motion.direction.x * 2.2 + this.playerPos.x * 0.15 + timing * 0.2;
+        if (this.motion.intentDirection === "left") aim -= 0.6;
+        else if (this.motion.intentDirection === "right") aim += 0.6;
+
+        aim = clamp(aim, -2.5, 2.5);
+
+        if (this.settings.assist === "beginner") {
+          if (aim > 1.5) aim = 1.5 + (aim - 1.5) * 0.3;
+          if (aim < -1.5) aim = -1.5 + (aim + 1.5) * 0.3;
+        }
+
+        power = clamp(this.motion.power * 0.95 + incomingSpeed / 130 - Math.abs(timing) * 0.05, 0.18, 1);
+        this.fly.swingAttempted = false;
+
+        this.shotCount++;
+        this.currentShotDiagnostic = {
+          shotId: this.shotCount,
+          scenario: intent === "serve" ? "SERVE" : intent.toUpperCase(),
+          visualOnsetTime: 0,
+          motorOnsetTime: 0,
+          prepareTime: 0,
+          strikeTime: 0,
+          predictedContactTime: 0,
+          closestDistance: 999,
+          closestTime: 0,
+          racketAtClosest: [this.fly.racketPos.x, this.fly.racketPos.y, this.fly.racketPos.z],
+          shuttleAtClosest: [s.p.x, s.p.y, s.p.z],
+          flyAtClosest: [this.fly.x, this.fly.y, this.fly.z],
+          result: "MISS",
+          racketStateAtClosest: "IDLE",
+          neuralReadiness: this.fly.lastMotorCommand?.arousal ?? 0.2,
+          mode: this.settings.flyEmbodimentMode,
+        };
+      } else {
+        // Classic AI heuristic aiming
+        aim = clamp(-this.playerPos.x * 0.25 + (this.random() - 0.5) * 2.5, -1.8, 1.8);
+        power = 0.55;
+        if (this.settings.assist === "beginner" && this.totalHits < 6) {
+          const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
+          power *= handicap;
+        }
       }
-    }
 
-    if (side === 1) {
-        power *= (0.65 + 0.35 * quality); // Weaker return on poor contact
-    }
+      if (side === 1) {
+        power *= (0.65 + 0.35 * quality);
+      }
 
-    const error =
-      side === 0
-        ? 0
-        : this.settings.opponentType === "fruitfly"
-          ? (1 - quality) * (this.random() - 0.5) * 1.5 // Fly gets some error on bad hits
-          : C.ai[this.settings.difficulty].error * (this.random() - 0.5) * (1 + (1 - quality) * 3);
-          
-    const target = v(aim + error, 0.03, sign * depth);
+      const error = side === 0 ? 0 : C.ai[this.settings.difficulty].error * (this.random() - 0.5) * (1 + (1 - quality) * 3);
+      const target = v(aim + error, 0.03, sign * depth);
 
-    if (intent === "smash" && s.p.y < 2.3) intent = "drive";
-    let velocity = shotVelocity(s.p, target, intent, power);
+      if (intent === "smash" && s.p.y < 2.3) intent = "drive";
+      velocity = shotVelocity(s.p, target, intent, power);
 
-    // Assisted net clearance
-    if (side === 0 || (side === 1 && quality > 0.75 && this.settings.difficulty === "normal")) {
+      // Assisted net clearance
+      if (side === 0 || (side === 1 && quality > 0.75 && this.settings.difficulty === "normal")) {
         const trial: Shuttle = {
           p: { ...s.p },
           prev: { ...s.p },
@@ -871,6 +836,7 @@ export class Game {
           }
           if (trial.p.y < 0) break;
         }
+      }
     }
 
     s.velocity = velocity;
@@ -880,7 +846,7 @@ export class Game {
     this.hits++;
     this.totalHits++;
     this.bestRally = Math.max(this.bestRally, this.hits);
-    this.lastShot = intent.toUpperCase();
+    this.lastShot = intentStr;
     this.events.push({
       type: intent === "serve" ? "serve" : "hit",
       text: this.lastShot,
@@ -1008,6 +974,10 @@ export class Game {
     this.ai.z = -3.9;
     this.ai.state = "WAIT";
     this.ai.attempted = false;
+    this.fly.x = 0;
+    this.fly.y = 1.4;
+    this.fly.z = -3.9;
+    this.fly.bridge.reset();
     const startPos = scenario === "fast" ? v(0, 2.4, 3.8) : v(0, 1.2, 3.8);
     if (params?.originOffset) {
       startPos.x += params.originOffset.x ?? 0;
