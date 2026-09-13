@@ -64,7 +64,6 @@ export interface ConnectomeManifest {
   neuronCount: number;
   edgeCount: number; // Exact count of directed biological edges (e.g. 44,781)
   biologicalSynapseTotal: number; // Total underlying biological synaptic contacts (e.g. 1,146,043)
-  synapseCount?: number; // Deprecated alias for edgeCount
   seedCount: number;
   sourceHashes?: {
     annotations?: string;
@@ -195,7 +194,6 @@ export interface NeuralTelemetrySnapshot {
   neuronCount: number;
   edgeCount: number;
   biologicalSynapseTotal: number;
-  synapseCount?: number; // Deprecated alias
   neurons: NeuronTelemetryItem[];
   regionActivity: Record<NeuropilRegion, number>; // Mean firing rate per region in Hz
   sensoryFeatures: FlySensoryFeatures;
@@ -208,8 +206,49 @@ export interface NeuralTelemetrySnapshot {
 export interface InterventionSettings {
   silencedNeuronIds: number[];
   silencedTypes: string[]; // e.g. ["LC4", "DNa02"]
-  synapticGain: number; // multiplier (default 1.0)
-  backgroundDrive: number; // pA or mV base excitation
+  synapticGain: number; // 0.2 to 3.0 (default 1.0)
+  backgroundDrive: number; // 0.0 to 5.0 (default 1.2)
+  sensoryNoise: number; // 0.0 to 2.0 (default 0.0)
   refractoryMultiplier: number;
   mode: "fruitfly" | "classic";
+}
+
+export interface NeuronDetailData {
+  index: number;
+  bodyId: string;
+  type: string;
+  instance?: string | null;
+  hemisphere?: string | null;
+  region: NeuropilRegion;
+  neurotransmitter?: string | null;
+  coordinateType?:
+    | "soma_voxel"
+    | "partner_centroid"
+    | "neuropil_fallback"
+    | string;
+  pos: [number, number, number];
+  inDegree: number;
+  inSynapses: number;
+  outDegree: number;
+  outSynapses: number;
+  vm: number;
+  firingRateHz: number;
+  spiking: boolean;
+}
+
+export interface LiveEventEntry {
+  id: number;
+  timeMs: number;
+  timeFormatted: string;
+  category:
+    | "stimulus"
+    | "sensory"
+    | "downstream"
+    | "descending"
+    | "embodiment"
+    | "contact"
+    | "miss";
+  icon: string;
+  title: string;
+  detail: string;
 }

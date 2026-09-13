@@ -93,7 +93,7 @@ function validateDir(dirPath) {
       `Manifest neuronCount (${manifest.neuronCount}) != neurons.json length (${nNeurons})`,
     );
   }
-  const edgeCount = manifest.edgeCount ?? manifest.synapseCount;
+  const edgeCount = manifest.edgeCount;
   if (edgeCount !== nEdges) {
     errors.push(
       `Manifest edgeCount (${edgeCount}) != indices length (${nEdges})`,
@@ -233,6 +233,9 @@ function validateDir(dirPath) {
   console.log(`Metadata         ${syntheticCount === 0 ? "PASS" : "FAIL"}`);
   console.log(
     `Provenance       ${manifest.provenance === "malecns-real" ? "PASS" : "FAIL"}`,
+  );
+  console.log(
+    `Source Check     SOURCE NOT AVAILABLE (Validating packaged CSR graph; raw MaleCNS feather tables absent)`,
   );
   console.log(`-------------------------------------------------------`);
 

@@ -55,7 +55,7 @@ describe("Fruit-Fly Connectome Subsystem", () => {
 
     it("loads CSR binary arrays with valid dimensions and positive conductances", () => {
       expect(graph.indptr.length).toBe(graph.neurons.length + 1);
-      const edgeCount = graph.manifest.edgeCount ?? graph.manifest.synapseCount;
+      const edgeCount = graph.manifest.edgeCount;
       expect(graph.indices.length).toBe(edgeCount);
       expect(graph.weights.length).toBe(edgeCount);
       expect(graph.signs.length).toBe(edgeCount);
@@ -81,9 +81,7 @@ describe("Fruit-Fly Connectome Subsystem", () => {
 
     it("reconciles canonical graph statistics between manifest and loaded arrays", () => {
       const edgeCount = graph.indices.length;
-      expect(graph.manifest.edgeCount ?? graph.manifest.synapseCount).toBe(
-        edgeCount,
-      );
+      expect(graph.manifest.edgeCount).toBe(edgeCount);
       expect(graph.manifest.neuronCount).toBe(graph.neurons.length);
 
       if (graph.biologicalWeights) {

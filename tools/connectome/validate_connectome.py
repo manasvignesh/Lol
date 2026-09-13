@@ -261,10 +261,19 @@ def validate_connectome_dir(connectome_dir: Path, raw_dir: Path | None = None) -
     print(f"CSR integrity    {'PASS' if len(errors) == 0 else 'FAIL'}")
     print(f"Metadata         {'PASS' if synthetic_count == 0 else 'FAIL'}")
     print(f"Provenance       {'PASS' if prov == 'malecns-real' else 'FAIL'}")
-    if raw_dir and raw_dir.exists():
-        print(f"Source IDs verif {verified_src_bodies:,} / {n_neurons:,}")
-        print(f"Source edges ver {verified_src_edges:,} / {n_edges:,} ({verified_src_synapses:,} biological synapses)")
-        print(f"Source SHA-256   {sha_status}")
+    if raw_dir and raw_dir.exists() and ann_p and w_p and nt_p:
+        if verified_src_bodies == n_neurons and verified_src_edges == n_edges and len(errors) == 0:
+            print(f"Source Check     SOURCE VERIFIED")
+            print(f"Source IDs verif {verified_src_bodies:,} / {n_neurons:,}")
+            print(f"Source edges ver {verified_src_edges:,} / {n_edges:,} ({verified_src_synapses:,} biological synapses)")
+            print(f"Source SHA-256   {sha_status}")
+        else:
+            print(f"Source Check     SOURCE VERIFICATION FAILED")
+            print(f"Source IDs verif {verified_src_bodies:,} / {n_neurons:,}")
+            print(f"Source edges ver {verified_src_edges:,} / {n_edges:,}")
+            print(f"Source SHA-256   {sha_status}")
+    else:
+        print(f"Source Check     SOURCE NOT AVAILABLE (Raw MaleCNS feather tables absent; verifying packaged CSR graph)")
     print("-------------------------------------------------------")
 
     if errors:

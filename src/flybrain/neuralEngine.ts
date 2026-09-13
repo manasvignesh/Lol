@@ -416,7 +416,6 @@ export class NeuralEngine {
       neuronCount: this.numNeurons,
       edgeCount,
       biologicalSynapseTotal,
-      synapseCount: edgeCount, // Deprecated alias
       neurons: items,
       regionActivity,
       sensoryFeatures: this.sensoryEncoder.getLastFeatures(),

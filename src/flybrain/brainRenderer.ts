@@ -3,6 +3,7 @@ import type {
   ConnectomeCSRGraph,
   NeuralTelemetrySnapshot,
   NeuronData,
+  NeuronDetailData,
   NeuronTelemetryItem,
   NeuropilRegion,
 } from "./types";
@@ -15,8 +16,9 @@ export class BrainRenderer {
   private graph: ConnectomeCSRGraph | null = null;
   private viewMode: BrainViewMode = "circuit";
   private hoveredNeuron: NeuronTelemetryItem | null = null;
-  private width = 400;
-  private height = 500;
+  private selectedNeuronIndex: number | null = null;
+  private width = 420;
+  private height = 520;
   private spikeHistory: { time: number; neuronIndex: number }[] = [];
   private rateHistory: {
     time: number;
@@ -26,6 +28,17 @@ export class BrainRenderer {
   }[] = [];
   private pulsePhase = 0;
   private representativeIndices: number[] = [];
+  private inDegrees: Int32Array | null = null;
+  private inSynapseSums: Int32Array | null = null;
+  private isPaused = false;
+  private rotY = 0;
+  private isDragging = false;
+  private lastMouseX = 0;
+
+  public onNeuronSelected?: (
+    item: NeuronTelemetryItem,
+    details: NeuronDetailData,
+  ) => void;
 
   constructor(container: HTMLElement) {
     this.canvas = document.createElement("canvas");
@@ -47,6 +60,7 @@ export class BrainRenderer {
   setGraph(graph: ConnectomeCSRGraph) {
     this.graph = graph;
     this.buildRepresentativeSet();
+    this.precomputeConnectivity();
   }
 
   private buildRepresentativeSet() {
@@ -54,7 +68,7 @@ export class BrainRenderer {
     const neurons = this.graph.neurons;
     const rep: number[] = [];
 
-    // Always include key seed populations and descending neurons
+    // Prioritize key seed populations, descending channels, and visual VPNs
     for (let i = 0; i < neurons.length; i++) {
       const n = neurons[i];
       const t = n.type || "";
@@ -67,11 +81,80 @@ export class BrainRenderer {
         t.startsWith("DN") ||
         t.startsWith("MDN") ||
         n.region === "Descending" ||
-        i % 4 === 0; // Downsample background interneurons for smooth 60fps rendering
+        n.region === "CentralComplex" ||
+        i % 3 === 0;
 
       if (isKey) rep.push(i);
     }
     this.representativeIndices = rep;
+  }
+
+  private precomputeConnectivity() {
+    if (!this.graph) return;
+    const n = this.graph.neurons.length;
+    this.inDegrees = new Int32Array(n);
+    this.inSynapseSums = new Int32Array(n);
+
+    const indptr = this.graph.indptr;
+    const indices = this.graph.indices;
+    const bioW = this.graph.biologicalWeights;
+
+    for (let i = 0; i < n; i++) {
+      const start = indptr[i];
+      const end = indptr[i + 1];
+      for (let k = start; k < end; k++) {
+        const post = indices[k];
+        if (post < n) {
+          this.inDegrees[post]++;
+          if (bioW) {
+            this.inSynapseSums[post] += bioW[k];
+          }
+        }
+      }
+    }
+  }
+
+  getNeuronDetails(index: number): NeuronDetailData | null {
+    if (!this.graph || index < 0 || index >= this.graph.neurons.length)
+      return null;
+    const n = this.graph.neurons[index];
+    const indptr = this.graph.indptr;
+    const outDegree = indptr[index + 1] - indptr[index];
+
+    let outSynapses = outDegree;
+    if (this.graph.biologicalWeights) {
+      let sum = 0;
+      for (let k = indptr[index]; k < indptr[index + 1]; k++) {
+        sum += this.graph.biologicalWeights[k];
+      }
+      outSynapses = sum;
+    }
+
+    const inDegree = this.inDegrees ? this.inDegrees[index] : 0;
+    const inSynapses = this.inSynapseSums
+      ? this.inSynapseSums[index]
+      : inDegree;
+
+    const telemItem = this.lastTelemetry?.neurons[index];
+
+    return {
+      index,
+      bodyId: n.bodyId,
+      type: n.type,
+      instance: n.instance,
+      hemisphere: n.hemisphere,
+      region: n.region,
+      neurotransmitter: n.neurotransmitter,
+      coordinateType: n.coordinateType || "soma_voxel",
+      pos: n.pos,
+      inDegree,
+      inSynapses,
+      outDegree,
+      outSynapses,
+      vm: telemItem ? telemItem.v : -65.0,
+      firingRateHz: telemItem ? telemItem.firingRateHz : 0,
+      spiking: telemItem ? telemItem.spiking : false,
+    };
   }
 
   setViewMode(mode: BrainViewMode) {
@@ -82,10 +165,23 @@ export class BrainRenderer {
     return this.viewMode;
   }
 
+  setPaused(paused: boolean) {
+    this.isPaused = paused;
+  }
+
+  selectNeuronByIndex(index: number) {
+    this.selectedNeuronIndex = index;
+    const details = this.getNeuronDetails(index);
+    const item = this.lastTelemetry?.neurons[index];
+    if (details && item && this.onNeuronSelected) {
+      this.onNeuronSelected(item, details);
+    }
+  }
+
   resize() {
     const rect = this.canvas.parentElement?.getBoundingClientRect() || {
-      width: 400,
-      height: 500,
+      width: 420,
+      height: 520,
     };
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.width = Math.max(200, rect.width);
@@ -98,15 +194,56 @@ export class BrainRenderer {
   private setupListeners() {
     window.addEventListener("resize", () => this.resize());
 
+    this.canvas.addEventListener("mousedown", (e) => {
+      this.isDragging = true;
+      this.lastMouseX = e.clientX;
+    });
+
+    window.addEventListener("mouseup", () => {
+      this.isDragging = false;
+    });
+
     this.canvas.addEventListener("mousemove", (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
+
+      if (this.isDragging && this.viewMode === "spatial") {
+        const dx = e.clientX - this.lastMouseX;
+        this.rotY += dx * 0.012;
+        this.lastMouseX = e.clientX;
+      }
+
       this.checkHover(mx, my);
     });
 
     this.canvas.addEventListener("mouseleave", () => {
       this.hoveredNeuron = null;
+      this.isDragging = false;
+    });
+
+    this.canvas.addEventListener("click", (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      // Check active pathway clicks first
+      if (this.lastTelemetry?.activePathway) {
+        const path = this.lastTelemetry.activePathway;
+        const boxY = this.height - 110;
+        if (my >= boxY && my <= boxY + 40) {
+          const slotW = (this.width - 32) / Math.max(1, path.length);
+          const clickedSlot = Math.floor((mx - 16) / slotW);
+          if (clickedSlot >= 0 && clickedSlot < path.length) {
+            this.selectNeuronByIndex(path[clickedSlot].index);
+            return;
+          }
+        }
+      }
+
+      if (this.hoveredNeuron) {
+        this.selectNeuronByIndex(this.hoveredNeuron.index);
+      }
     });
   }
 
@@ -114,12 +251,13 @@ export class BrainRenderer {
     if (!this.lastTelemetry || !this.graph) return;
 
     let closest: NeuronTelemetryItem | null = null;
-    let minDist = 18;
+    let minDist = 20;
 
     const subset =
       this.representativeIndices.length > 0
         ? this.representativeIndices
         : this.lastTelemetry.neurons.map((_, i) => i);
+
     for (const idx of subset) {
       const item = this.lastTelemetry.neurons[idx];
       if (!item) continue;
@@ -145,24 +283,28 @@ export class BrainRenderer {
     this.lastTelemetry = telemetry;
     this.pulsePhase += 0.05;
 
-    // Track active spikes
-    const now = performance.now();
-    for (let i = 0; i < telemetry.neurons.length; i++) {
-      if (telemetry.neurons[i]?.spiking) {
-        this.spikeHistory.push({ time: now, neuronIndex: i });
-      }
+    if (!this.isDragging && this.viewMode === "spatial") {
+      this.rotY += 0.003; // Subtle organic rotation
     }
-    // Prune spikes older than 1.2s
-    this.spikeHistory = this.spikeHistory.filter((s) => now - s.time < 1200);
 
-    // Track rate history for oscilloscope chart
-    this.rateHistory.push({
-      time: now,
-      optic: telemetry.regionActivity.OpticLobe || 0,
-      central: telemetry.regionActivity.CentralComplex || 0,
-      descending: telemetry.regionActivity.Descending || 0,
-    });
-    if (this.rateHistory.length > 80) this.rateHistory.shift();
+    // Record spikes if not paused
+    const now = performance.now();
+    if (!this.isPaused) {
+      for (let i = 0; i < telemetry.neurons.length; i++) {
+        if (telemetry.neurons[i]?.spiking) {
+          this.spikeHistory.push({ time: now, neuronIndex: i });
+        }
+      }
+      this.spikeHistory = this.spikeHistory.filter((s) => now - s.time < 1200);
+
+      this.rateHistory.push({
+        time: now,
+        optic: telemetry.regionActivity.OpticLobe || 0,
+        central: telemetry.regionActivity.CentralComplex || 0,
+        descending: telemetry.regionActivity.Descending || 0,
+      });
+      if (this.rateHistory.length > 80) this.rateHistory.shift();
+    }
 
     const ctx = this.ctx;
     const w = this.width;
@@ -170,8 +312,8 @@ export class BrainRenderer {
 
     ctx.clearRect(0, 0, w, h);
 
-    // Dark canvas background with subtle grid
-    ctx.fillStyle = "rgba(10, 18, 24, 0.95)";
+    // High-tech dark background with subtle blueprint grid
+    ctx.fillStyle = "rgba(8, 16, 22, 0.96)";
     ctx.fillRect(0, 0, w, h);
 
     this.drawGrid(w, h);
@@ -184,14 +326,14 @@ export class BrainRenderer {
       this.drawRasterView(telemetry, w, h);
     }
 
-    // Draw active pathway trace overlay
+    // Active pathway trace overlay
     if (telemetry.activePathway && telemetry.activePathway.length > 0) {
       this.drawActivePathway(telemetry.activePathway, w, h);
     }
 
     this.drawSensoryMotorBar(telemetry, w, h);
 
-    // Draw hover tooltip
+    // Tooltip
     if (this.hoveredNeuron) {
       this.drawTooltip(this.hoveredNeuron, w, h);
     }
@@ -199,14 +341,14 @@ export class BrainRenderer {
 
   private drawGrid(w: number, h: number) {
     const ctx = this.ctx;
-    ctx.strokeStyle = "rgba(42, 75, 84, 0.2)";
+    ctx.strokeStyle = "rgba(42, 75, 84, 0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let x = 0; x < w; x += 30) {
+    for (let x = 0; x < w; x += 32) {
       ctx.moveTo(x, 0);
       ctx.lineTo(x, h);
     }
-    for (let y = 0; y < h; y += 30) {
+    for (let y = 0; y < h; y += 32) {
       ctx.moveTo(0, y);
       ctx.lineTo(w, y);
     }
@@ -214,7 +356,7 @@ export class BrainRenderer {
   }
 
   /**
-   * CIRCUIT FLOW VIEW: Layered functional compartments
+   * 1. CIRCUIT FLOW VIEW: Layered functional compartments with dynamic propagation
    */
   private drawCircuitView(
     telemetry: NeuralTelemetrySnapshot,
@@ -224,54 +366,91 @@ export class BrainRenderer {
     const ctx = this.ctx;
     if (!this.graph) return;
 
-    // Compartment boundaries
-    const regions: {
+    const compartments: {
       name: string;
+      subtext: string;
       key: NeuropilRegion;
       y: number;
+      h: number;
       color: string;
     }[] = [
       {
-        name: "OPTIC LOBE (LC4/6/10 Looming & Tracking)",
+        name: "1. VISION (Optic Lobe VPNs)",
+        subtext: "LC4 Looming · LC6 · LC10 Retinotopic Target Tracking",
         key: "OpticLobe",
-        y: 40,
+        y: 28,
+        h: 70,
         color: "#45d0df",
       },
       {
-        name: "CENTRAL COMPLEX / LAL (EPG/PEN/PFL)",
+        name: "2. INTERMEDIATE (Protocerebrum / LAL)",
+        subtext: "Lateral Accessory Lobe · Reciprocal Inhibition Routing",
+        key: "Protocerebrum",
+        y: 108,
+        h: 60,
+        color: "#a55eea",
+      },
+      {
+        name: "3. CENTRAL / NAVIGATION (CX Heading)",
+        subtext: "EPG Compass Ring Attractor · PEN · PFL3 Motor Vectors",
         key: "CentralComplex",
-        y: 135,
+        y: 178,
+        h: 60,
         color: "#61e89b",
       },
       {
-        name: "DESCENDING CHANNELS (DNa02/DNp01/DNb01)",
+        name: "4. DESCENDING OUTPUT (Brain ➔ VNC)",
+        subtext: "DNa01/02 Steering · DNp01 Thrust · DNb01/GF Strike",
         key: "Descending",
-        y: 240,
+        y: 248,
+        h: 65,
         color: "#f7b731",
       },
       {
-        name: "VNC MOTOR EFFECTORS (Flight/Leg Actuators)",
+        name: "5. ENGINEERED EMBODIMENT",
+        subtext: "Court Flight Velocity (vx, vz) · Swept Racket Return",
         key: "VNC",
-        y: 340,
+        y: 323,
+        h: 65,
         color: "#ff5e7e",
       },
     ];
 
-    for (const r of regions) {
-      const act = telemetry.regionActivity[r.key] || 0;
-      ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-      ctx.font = "9px monospace";
-      ctx.fillText(`${r.name}  [${act.toFixed(1)} Hz]`, 14, r.y - 8);
+    for (const c of compartments) {
+      const act = telemetry.regionActivity[c.key] || 0;
+      const normAct = Math.min(1.0, act / 35.0);
 
-      ctx.strokeStyle = r.color;
-      ctx.globalAlpha = 0.12;
+      // Compartment Box
+      ctx.fillStyle = `rgba(14, 26, 34, ${0.45 + normAct * 0.25})`;
       ctx.beginPath();
-      ctx.roundRect(10, r.y - 4, w - 20, 75, 6);
+      ctx.roundRect(10, c.y, w - 20, c.h, 6);
+      ctx.fill();
+
+      ctx.strokeStyle = c.color;
+      ctx.globalAlpha = 0.25 + normAct * 0.55;
+      ctx.lineWidth = 1.2;
       ctx.stroke();
       ctx.globalAlpha = 1.0;
+
+      // Activity Energy Bar on left edge
+      ctx.fillStyle = c.color;
+      ctx.fillRect(10, c.y, 4, c.h * normAct);
+
+      // Title & Subtitle
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 9.5px monospace";
+      ctx.fillText(c.name, 20, c.y + 14);
+
+      ctx.fillStyle = c.color;
+      ctx.font = "bold 9px monospace";
+      ctx.fillText(`[${act.toFixed(1)} Hz]`, w - 75, c.y + 14);
+
+      ctx.fillStyle = "rgba(180, 205, 215, 0.7)";
+      ctx.font = "8px sans-serif";
+      ctx.fillText(c.subtext, 20, c.y + 26);
     }
 
-    // Synaptic connections (render subset of active synapses)
+    // Draw active biological synapse connections
     ctx.lineWidth = 1.0;
     const subset = this.representativeIndices;
     for (let s = 0; s < subset.length; s += 2) {
@@ -290,10 +469,10 @@ export class BrainRenderer {
           sign > 0 ? "rgba(97, 232, 155, 0.08)" : "rgba(255, 94, 126, 0.08)";
         if (preSpiking) {
           ctx.strokeStyle =
-            sign > 0 ? "rgba(97, 232, 155, 0.7)" : "rgba(255, 94, 126, 0.7)";
-          ctx.lineWidth = 1.4;
+            sign > 0 ? "rgba(97, 232, 155, 0.85)" : "rgba(255, 94, 126, 0.85)";
+          ctx.lineWidth = 1.6;
         } else {
-          ctx.lineWidth = 0.8;
+          ctx.lineWidth = 0.7;
         }
 
         ctx.beginPath();
@@ -308,12 +487,12 @@ export class BrainRenderer {
       const n = telemetry.neurons[idx];
       if (!n) continue;
       const pos = this.getNeuronScreenPos(idx);
-      this.drawNeuronNode(pos.x, pos.y, n);
+      this.drawNeuronNode(pos.x, pos.y, n, idx === this.selectedNeuronIndex);
     }
   }
 
   /**
-   * SPATIAL ANATOMICAL VIEW: 3D MaleCNS Anatomical Coordinates
+   * 2. CONNECTOME VIEW: 3D MaleCNS Anatomical Layout with EM Voxel Coordinates
    */
   private drawSpatialView(
     telemetry: NeuralTelemetrySnapshot,
@@ -323,12 +502,16 @@ export class BrainRenderer {
     const ctx = this.ctx;
     if (!this.graph) return;
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-    ctx.font = "10px monospace";
+    ctx.fillStyle = "rgba(69, 208, 223, 0.75)";
+    ctx.font = "bold 9.5px monospace";
+    ctx.fillText(`3D MALECNS v1.0 ANATOMICAL GRAPH`, 14, 20);
+
+    ctx.fillStyle = "rgba(160, 185, 195, 0.6)";
+    ctx.font = "8.5px sans-serif";
     ctx.fillText(
-      `MALECNS v1.0 ANATOMICAL GRAPH (${telemetry.neuronCount.toLocaleString()} neurons)`,
+      `Drag to rotate · Showing ${this.representativeIndices.length} representative neurons`,
       14,
-      25,
+      32,
     );
 
     const subset = this.representativeIndices;
@@ -345,9 +528,9 @@ export class BrainRenderer {
         const preSpike = telemetry.neurons[i]?.spiking;
 
         ctx.strokeStyle = preSpike
-          ? "rgba(255, 255, 255, 0.75)"
-          : "rgba(69, 208, 223, 0.06)";
-        ctx.lineWidth = preSpike ? 1.5 : 0.8;
+          ? "rgba(255, 255, 255, 0.85)"
+          : "rgba(69, 208, 223, 0.08)";
+        ctx.lineWidth = preSpike ? 1.8 : 0.7;
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
@@ -360,12 +543,12 @@ export class BrainRenderer {
       const n = telemetry.neurons[idx];
       if (!n) continue;
       const pos = this.getSpatialScreenPos(idx, w, h);
-      this.drawNeuronNode(pos.x, pos.y, n);
+      this.drawNeuronNode(pos.x, pos.y, n, idx === this.selectedNeuronIndex);
     }
   }
 
   /**
-   * RASTER & FIRING RATE OSCILLOSCOPE VIEW
+   * 3. SPIKE VIEW: Multi-Population Raster & Rate Oscilloscope
    */
   private drawRasterView(
     telemetry: NeuralTelemetrySnapshot,
@@ -373,30 +556,38 @@ export class BrainRenderer {
     h: number,
   ) {
     const ctx = this.ctx;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-    ctx.font = "10px monospace";
-    ctx.fillText(`REAL-TIME SPIKE RASTER & RATE OSCILLOSCOPE`, 14, 25);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.font = "bold 10px monospace";
+    ctx.fillText(`SPIKE RASTER & POPULATION OSCILLOSCOPE`, 14, 20);
 
     const now = performance.now();
-    const chartY = 40;
+    const chartY = 32;
     const chartH = 175;
 
+    // Raster background box
+    ctx.fillStyle = "rgba(10, 20, 26, 0.6)";
+    ctx.fillRect(14, chartY, w - 28, chartH);
+    ctx.strokeStyle = "rgba(69, 208, 223, 0.25)";
+    ctx.strokeRect(14, chartY, w - 28, chartH);
+
     // Draw spike dots
-    ctx.fillStyle = "rgba(69, 208, 223, 0.85)";
+    ctx.fillStyle = "rgba(69, 208, 223, 0.9)";
     const totalN = this.graph?.neurons.length || 2439;
     for (const spike of this.spikeHistory) {
       const age = (now - spike.time) / 1200; // 0 to 1
-      const x = w - 20 - age * (w - 40);
+      const x = w - 16 - age * (w - 32);
       const y = chartY + (spike.neuronIndex / totalN) * chartH;
-      ctx.fillRect(x, y, 2, 2);
+      ctx.fillRect(x, y, 2.2, 2.2);
     }
 
     // Multi-region firing rate curves
-    const curveY = chartY + chartH + 25;
-    const curveH = 95;
+    const curveY = chartY + chartH + 18;
+    const curveH = 85;
 
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-    ctx.strokeRect(20, curveY, w - 40, curveH);
+    ctx.fillStyle = "rgba(10, 20, 26, 0.6)";
+    ctx.fillRect(14, curveY, w - 28, curveH);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+    ctx.strokeRect(14, curveY, w - 28, curveH);
 
     const drawCurve = (
       rates: number[],
@@ -408,7 +599,7 @@ export class BrainRenderer {
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       for (let i = 0; i < rates.length; i++) {
-        const x = 20 + (i / Math.max(1, rates.length - 1)) * (w - 40);
+        const x = 14 + (i / Math.max(1, rates.length - 1)) * (w - 28);
         const val = Math.min(100, rates[i]) / 100;
         const y = curveY + curveH - val * curveH;
         if (i === 0) ctx.moveTo(x, y);
@@ -417,8 +608,8 @@ export class BrainRenderer {
       ctx.stroke();
 
       ctx.fillStyle = color;
-      ctx.font = "9px monospace";
-      ctx.fillText(`${label}`, 24 + offsetIdx * 90, curveY - 6);
+      ctx.font = "bold 8.5px monospace";
+      ctx.fillText(`${label}`, 18 + offsetIdx * 82, curveY - 4);
     };
 
     drawCurve(
@@ -467,28 +658,43 @@ export class BrainRenderer {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Display active pathway breadcrumbs in bottom corner
-    ctx.fillStyle = "rgba(10, 20, 26, 0.92)";
-    ctx.fillRect(10, h - 110, w - 20, 38);
+    // Interactive clickable active pathway breadcrumbs in bottom corner
+    const boxY = h - 110;
+    ctx.fillStyle = "rgba(10, 20, 26, 0.94)";
+    ctx.fillRect(10, boxY, w - 20, 38);
     ctx.strokeStyle = "#ffd32a";
     ctx.lineWidth = 1;
-    ctx.strokeRect(10, h - 110, w - 20, 38);
+    ctx.strokeRect(10, boxY, w - 20, 38);
 
     ctx.fillStyle = "#ffd32a";
-    ctx.font = "bold 9px monospace";
-    ctx.fillText("ACTIVE PATHWAY TRACE (MaleCNS v1.0):", 16, h - 96);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "9px monospace";
-    const routeText = path.map((p) => `${p.type}[${p.bodyId}]`).join(" ➔ ");
+    ctx.font = "bold 8.5px monospace";
     ctx.fillText(
-      routeText.length > 50 ? routeText.substring(0, 48) + "..." : routeText,
+      "⚡ ACTIVE CONNECTOME PATH (Click node to inspect):",
       16,
-      h - 82,
+      boxY + 12,
     );
+
+    const slotW = (w - 32) / Math.max(1, path.length);
+    for (let i = 0; i < path.length; i++) {
+      const p = path[i];
+      const px = 16 + i * slotW;
+      ctx.fillStyle = "rgba(255, 211, 42, 0.15)";
+      ctx.fillRect(px, boxY + 18, slotW - 6, 16);
+      ctx.strokeStyle = "rgba(255, 211, 42, 0.4)";
+      ctx.strokeRect(px, boxY + 18, slotW - 6, 16);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 8px monospace";
+      ctx.fillText(`${p.type}`, px + 3, boxY + 29);
+    }
   }
 
-  private drawNeuronNode(x: number, y: number, item: NeuronTelemetryItem) {
+  private drawNeuronNode(
+    x: number,
+    y: number,
+    item: NeuronTelemetryItem,
+    isSelected: boolean,
+  ) {
     const ctx = this.ctx;
     const isHovered = this.hoveredNeuron?.index === item.index;
     const rate = item.firingRateHz;
@@ -499,15 +705,17 @@ export class BrainRenderer {
     else if (item.region === "Descending") baseColor = "#f7b731";
     else if (item.region === "VNC") baseColor = "#ff5e7e";
 
-    const radius = isHovered
-      ? 6.5
-      : item.spiking
-        ? 5.0
-        : Math.max(2.2, Math.min(4.2, 2.2 + rate * 0.04));
+    const radius = isSelected
+      ? 7.5
+      : isHovered
+        ? 6.5
+        : item.spiking
+          ? 5.2
+          : Math.max(2.4, Math.min(4.4, 2.4 + rate * 0.04));
 
     if (item.spiking) {
       // White glow halo
-      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
       ctx.beginPath();
       ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
       ctx.fill();
@@ -518,9 +726,9 @@ export class BrainRenderer {
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    if (isHovered) {
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
+    if (isHovered || isSelected) {
+      ctx.strokeStyle = isSelected ? "#ffd32a" : "#ffffff";
+      ctx.lineWidth = isSelected ? 2.2 : 1.5;
       ctx.stroke();
     }
   }
@@ -531,12 +739,12 @@ export class BrainRenderer {
     h: number,
   ) {
     const ctx = this.ctx;
-    const barY = h - 65;
-    const barH = 55;
+    const barY = h - 68;
+    const barH = 58;
 
-    ctx.fillStyle = "rgba(16, 28, 36, 0.9)";
+    ctx.fillStyle = "rgba(12, 24, 32, 0.94)";
     ctx.fillRect(10, barY, w - 20, barH);
-    ctx.strokeStyle = "rgba(69, 208, 223, 0.3)";
+    ctx.strokeStyle = "rgba(69, 208, 223, 0.35)";
     ctx.strokeRect(10, barY, w - 20, barH);
 
     const f = telemetry.sensoryFeatures;
@@ -568,7 +776,7 @@ export class BrainRenderer {
       ctx.fillText(
         `⚡ STRIKE: ${m.swingType.toUpperCase()} (${(m.swingPower * 100).toFixed(0)}%)`,
         16,
-        barY + 48,
+        barY + 49,
       );
     }
   }
@@ -580,12 +788,12 @@ export class BrainRenderer {
         ? this.getSpatialScreenPos(item.index, w, h)
         : this.getNeuronScreenPos(item.index);
 
-    const boxW = 210;
-    const boxH = 104;
+    const boxW = 215;
+    const boxH = 106;
     const tx = Math.min(w - (boxW + 10), Math.max(10, pos.x + 10));
     const ty = Math.min(h - (boxH + 10), Math.max(10, pos.y - 30));
 
-    ctx.fillStyle = "rgba(5, 12, 16, 0.95)";
+    ctx.fillStyle = "rgba(6, 14, 18, 0.96)";
     ctx.fillRect(tx, ty, boxW, boxH);
     ctx.strokeStyle = "#45d0df";
     ctx.lineWidth = 1;
@@ -619,7 +827,7 @@ export class BrainRenderer {
     const coordStr =
       item.coordinateType === "soma_voxel"
         ? "EM voxel soma (MaleCNS v1.0)"
-        : "Visualization coordinate: derived/fallback";
+        : "Coord: derived/fallback";
     ctx.fillText(coordStr, tx + 8, ty + 70);
 
     ctx.fillText(
@@ -630,7 +838,7 @@ export class BrainRenderer {
 
     ctx.fillStyle = item.spiking ? "#61e89b" : "#45d0df";
     ctx.fillText(
-      `Spike: ${item.spiking ? "ACTIVE" : "RESTING"} | REAL CONNECTOME`,
+      `Spike: ${item.spiking ? "ACTIVE" : "RESTING"} | CLICK TO INSPECT`,
       tx + 8,
       ty + 98,
     );
@@ -641,17 +849,16 @@ export class BrainRenderer {
     const n = this.graph.neurons[idx];
     const w = this.width;
 
-    let baseY = 55;
-    if (n.region === "CentralComplex") baseY = 150;
-    else if (n.region === "Protocerebrum") baseY = 195;
-    else if (n.region === "Descending") baseY = 255;
-    else if (n.region === "VNC") baseY = 355;
+    let baseY = 58;
+    if (n.region === "Protocerebrum") baseY = 138;
+    else if (n.region === "CentralComplex") baseY = 208;
+    else if (n.region === "Descending") baseY = 278;
+    else if (n.region === "VNC") baseY = 352;
 
-    // Use normalized MaleCNS anatomical X position
     const nx = n.pos ? n.pos[0] : 0;
     const x = w * 0.5 + nx * (w * 0.42);
     const ny = n.pos ? n.pos[1] : 0;
-    const y = baseY + ny * 18;
+    const y = baseY + ny * 16;
 
     return { x: Math.max(18, Math.min(w - 18, x)), y: Math.max(25, y) };
   }
@@ -664,15 +871,21 @@ export class BrainRenderer {
     if (!this.graph) return { x: 0, y: 0 };
     const n = this.graph.neurons[idx];
     const cx = w * 0.5;
-    const cy = h * 0.45;
+    const cy = h * 0.46;
     const scale = Math.min(w, h) * 0.42;
 
     const nx = n.pos ? n.pos[0] : 0;
     const ny = n.pos ? n.pos[1] : 0;
     const nz = n.pos ? n.pos[2] : 0;
 
-    const x = cx + nx * scale;
-    const y = cy + (ny * 0.8 - nz * 0.5) * scale;
+    // Apply Y-axis rotation
+    const cosR = Math.cos(this.rotY);
+    const sinR = Math.sin(this.rotY);
+    const rx = nx * cosR - nz * sinR;
+    const rz = nx * sinR + nz * cosR;
+
+    const x = cx + rx * scale;
+    const y = cy + (ny * 0.85 - rz * 0.4) * scale;
     return { x, y };
   }
 }

@@ -7,6 +7,7 @@ export class InterventionsManager {
     silencedTypes: [],
     synapticGain: 1.0,
     backgroundDrive: 1.2,
+    sensoryNoise: 0.0,
     refractoryMultiplier: 1.0,
     mode: "fruitfly",
   };
@@ -23,6 +24,15 @@ export class InterventionsManager {
 
   isSilenced(neuronIndex: number): boolean {
     return this.silencedMask[neuronIndex] === 1;
+  }
+
+  isTypeSilenced(typePrefix: string): boolean {
+    return this.settings.silencedTypes.some(
+      (t) =>
+        t === typePrefix ||
+        t.startsWith(typePrefix) ||
+        typePrefix.startsWith(t),
+    );
   }
 
   getMask(): Uint8Array {
@@ -68,6 +78,7 @@ export class InterventionsManager {
       silencedTypes: [],
       synapticGain: 1.0,
       backgroundDrive: 1.2,
+      sensoryNoise: 0.0,
       refractoryMultiplier: 1.0,
       mode: "fruitfly",
     };

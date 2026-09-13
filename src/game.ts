@@ -497,7 +497,113 @@ export class Game {
     }
   }
 
+  lastMissReason = "";
+  lastContactMoment: { time: number; power: number; type: string } | null =
+    null;
+
+  diagnoseFlyMiss(): string {
+    const s = this.shuttle;
+    const bridge = this.fly.bridge;
+    const engine = bridge.getEngine();
+    const interventions = engine?.interventions;
+
+    if (
+      interventions?.isTypeSilenced("LC4") ||
+      interventions?.isTypeSilenced("LC6")
+    ) {
+      return "PATHWAY SILENCED (LC4/6 Looming)";
+    }
+    if (
+      interventions?.isTypeSilenced("DNa02") ||
+      interventions?.isTypeSilenced("DNa01")
+    ) {
+      return "PATHWAY SILENCED (DNa02 Steering)";
+    }
+    if (
+      interventions?.isTypeSilenced("DNb01") ||
+      interventions?.isTypeSilenced("DNp01")
+    ) {
+      return "PATHWAY SILENCED (DNb01 Strike Trigger)";
+    }
+
+    const latOffset = Math.abs(s.p.x - this.fly.x);
+    if (latOffset > 1.2) {
+      return `STEERING ERROR (Offset: ${latOffset.toFixed(2)}m)`;
+    }
+
+    const flyMotor = this.fly.lastMotorCommand;
+    if (flyMotor.arousal < 0.25) {
+      return "INSUFFICIENT MOTOR ACTIVATION";
+    }
+
+    if (this.fly.swingActiveTime > 0) {
+      return "RACKET MISSED CONTACT";
+    }
+
+    return "LATE MOTOR RESPONSE";
+  }
+
+  feedSyntheticShot(
+    scenario: "left" | "right" | "center" | "high" | "fast" | "drop",
+  ) {
+    this.ready();
+    const startPos = v(0, 1.2, 3.8);
+    this.playerPos = v(0, 0, C.playerBase.z);
+    this.racket = v(0.3, 1.4, 3.4);
+    this.shuttle.p = { ...startPos };
+    this.shuttle.prev = { ...startPos };
+
+    let target = v(0, 0.05, -4.2);
+    let intent: Intent = "clear";
+    let power = 0.6;
+
+    if (scenario === "left") {
+      target = v(-1.8, 0.05, -3.8);
+      intent = "drive";
+      power = 0.65;
+    } else if (scenario === "right") {
+      target = v(1.8, 0.05, -3.8);
+      intent = "drive";
+      power = 0.65;
+    } else if (scenario === "center") {
+      target = v(0, 0.05, -4.0);
+      intent = "drive";
+      power = 0.6;
+    } else if (scenario === "high") {
+      target = v(0.4, 0.05, -5.4);
+      intent = "clear";
+      power = 0.75;
+    } else if (scenario === "fast") {
+      target = v(-0.8, 0.05, -3.2);
+      intent = "smash";
+      power = 0.95;
+    } else if (scenario === "drop") {
+      target = v(0.6, 0.05, -1.8);
+      intent = "drop";
+      power = 0.45;
+    }
+
+    this.shuttle.velocity = shotVelocity(this.shuttle.p, target, intent, power);
+    this.shuttle.lastHit = 0;
+    this.state = "rally";
+    this.lastContact = this.time;
+    this.hits = 1;
+    this.totalHits++;
+    this.lastShot = `TEST: ${scenario.toUpperCase()}`;
+    this.events.push({
+      type: "hit",
+      text: `TEST: ${scenario.toUpperCase()}`,
+      position: { ...this.shuttle.p },
+      speed: len(this.shuttle.velocity) * 3.6,
+    });
+  }
+
   point(side: 0 | 1, reason: string) {
+    if (side === 0 && this.settings.opponentType === "fruitfly") {
+      this.lastMissReason = this.diagnoseFlyMiss();
+      reason = `${reason} (${this.lastMissReason})`;
+    }
+
     this.match.point(side);
     this.state = "point";
     this.timer = 0;

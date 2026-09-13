@@ -21,7 +21,7 @@ import type {
  * - Translates biological steering and thrust into court flight velocities (vx, vz)
  * - Uses motor burst and turn impulses combined with racket geometry to trigger cyber-racket swings
  * - Determines racket stroke type (forehand, backhand, overhead, lift) from spatial geometry
- * - Enforces biological stroke refractory cooldown
+ * - Enforces engineered racket/stroke cooldown
  */
 export class EmbodimentAdapter {
   private smoothedVx = 0;
@@ -65,7 +65,7 @@ export class EmbodimentAdapter {
       features.distance < 2.5
     ) {
       swingTriggered = true;
-      this.swingCooldown = 0.35; // 350ms stroke refractory cooldown
+      this.swingCooldown = 0.35; // 350ms engineered racket/stroke cooldown
       swingPower = Math.min(1.0, 0.45 + maxImpulse * 0.55);
 
       // Swing orientation derived from shuttle spatial geometry relative to fly racket
