@@ -473,7 +473,7 @@ describe("match and connected rallies", () => {
   });
 
   it("connects synthetic pose → motion → serve → AI → auto-footwork contact → scoring", () => {
-    const g = new Game({ ...defaults }, seeded(7)),
+    const g = new Game({ ...defaults, opponentType: "classic" }, seeded(7)),
       m = new MotionInterpreter();
     let time = 1000;
     for (let i = 0; i < 9; i++) {

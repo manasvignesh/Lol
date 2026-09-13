@@ -26,8 +26,10 @@ export class FlyOpponent {
   };
   swingAttempted = false;
   racketPos: V3 = v(0.55, 1.25, -3.55);
+  previousRacket: V3 = v(0.55, 1.25, -3.55);
   racketRotationZ = 0.4;
   hoverTime = 0;
+  swingActiveTime = 0;
 
   constructor() {
     this.bridge = new NeuralBridge();
@@ -43,8 +45,10 @@ export class FlyOpponent {
     this.z = -3.9;
     this.heading = 0;
     this.swingAttempted = false;
+    this.swingActiveTime = 0;
     this.hoverTime = 0;
     this.racketPos = v(0.55, 1.25, -3.55);
+    this.previousRacket = v(0.55, 1.25, -3.55);
     this.bridge.reset();
   }
 
@@ -55,6 +59,7 @@ export class FlyOpponent {
     settings: Settings,
   ): FlyMotorCommand {
     this.hoverTime += dt;
+    this.previousRacket = { ...this.racketPos };
 
     // Prepare optical sensory input for the connectome
     const sensoryInput: FlySensoryInput = {
@@ -69,8 +74,14 @@ export class FlyOpponent {
     const motor = this.bridge.update(dt, sensoryInput);
     this.lastMotorCommand = motor;
 
+    if (motor.swingTriggered) {
+      this.swingActiveTime = 0.28; // Swing stroke active for 280ms
+    } else {
+      this.swingActiveTime = Math.max(0, this.swingActiveTime - dt);
+    }
+
     // Apply lateral & longitudinal velocity decoded from DNa02 & DNp01 descending neurons
-    const difficultyMultiplier = settings.difficulty === "normal" ? 1.3 : 1.0;
+    const difficultyMultiplier = settings.difficulty === "normal" ? 1.35 : 1.05;
     const effectiveVx = motor.vx * difficultyMultiplier;
     const effectiveVz = motor.vz * difficultyMultiplier;
 
@@ -78,7 +89,7 @@ export class FlyOpponent {
     this.z += effectiveVz * dt;
 
     // Constrain to fly's court boundaries
-    this.x = clamp(this.x, -2.5, 2.5);
+    this.x = clamp(this.x, -2.6, 2.6);
     this.z = clamp(this.z, -6.1, -0.8);
 
     // Natural flight hover oscillation modulated by wing arousal
@@ -90,23 +101,21 @@ export class FlyOpponent {
     this.heading = clamp(motor.steerTorque * 0.25, -0.4, 0.4);
 
     // Update fly racket position based on strike state
-    const isStriking = motor.swingTriggered || motor.flightState === "STRIKE";
-    const targetRacketX =
-      this.x + (motor.swingType === "backhand" ? -0.45 : 0.55);
-    const targetRacketY = isStriking ? this.y + 0.4 : this.y - 0.15;
-    const targetRacketZ = this.z + 0.35;
+    const isStriking =
+      this.swingActiveTime > 0 || motor.flightState === "STRIKE";
+    const isBackhand = motor.swingType === "backhand" || this.x > shuttle.p.x;
+    const targetRacketX = this.x + (isBackhand ? -0.45 : 0.45);
+    const targetRacketY = isStriking ? this.y + 0.35 : this.y - 0.15;
+    const targetRacketZ = this.z + (isStriking ? 0.65 : 0.3);
 
+    const lerpSpeed = isStriking ? 32 : 16;
     this.racketPos.x +=
-      (targetRacketX - this.racketPos.x) * Math.min(1.0, dt * 18);
+      (targetRacketX - this.racketPos.x) * Math.min(1.0, dt * lerpSpeed);
     this.racketPos.y +=
-      (targetRacketY - this.racketPos.y) * Math.min(1.0, dt * 18);
+      (targetRacketY - this.racketPos.y) * Math.min(1.0, dt * lerpSpeed);
     this.racketPos.z +=
-      (targetRacketZ - this.racketPos.z) * Math.min(1.0, dt * 18);
-    this.racketRotationZ = isStriking
-      ? motor.swingType === "backhand"
-        ? 0.9
-        : -0.9
-      : 0.4;
+      (targetRacketZ - this.racketPos.z) * Math.min(1.0, dt * lerpSpeed);
+    this.racketRotationZ = isStriking ? (isBackhand ? 0.95 : -0.95) : 0.4;
 
     return motor;
   }

@@ -342,16 +342,25 @@ export class Game {
     if (this.settings.opponentType === "fruitfly") {
       if (
         s.lastHit === 0 &&
-        s.p.z < -0.5 &&
-        s.p.y < 2.8 &&
+        s.p.z < -0.4 &&
+        s.p.y < 3.2 &&
         s.p.y > 0.25 &&
         !this.fly.swingAttempted
       ) {
-        const flyDist = Math.hypot(s.p.x - this.fly.x, s.p.z - this.fly.z);
-        if (
-          (flyMotor && flyMotor.swingTriggered) ||
-          (flyDist < 1.35 && s.velocity.y < 0)
-        ) {
+        // Physical swept collision between cyber-racket and shuttle path
+        const racketContact = sweptDistance(
+          this.fly.previousRacket,
+          this.fly.racketPos,
+          s.prev,
+          s.p,
+        );
+
+        // Fly must have an active neural strike stroke AND physical blade contact
+        const isSwinging =
+          (flyMotor && flyMotor.swingTriggered) || this.fly.swingActiveTime > 0;
+        const racketBladeRadius = 0.65; // Physical racket contact radius
+
+        if (isSwinging && racketContact.distance < racketBladeRadius) {
           this.fly.swingAttempted = true;
           const hitIntent: Intent =
             flyMotor?.swingType === "overhead"
@@ -390,16 +399,7 @@ export class Game {
     const s = this.shuttle;
     const incomingSpeed = len(s.velocity);
     const timing = side === 0 ? clamp((this.racket.z - s.p.z) / 1.1, -1, 1) : 0;
-    const power =
-      side === 0
-        ? clamp(
-            this.motion.power * 0.92 +
-              incomingSpeed / 140 -
-              Math.abs(timing) * 0.06,
-            0.15,
-            1,
-          )
-        : 0.55;
+    let power = 0.55;
     const sign = side === 0 ? -1 : 1;
 
     const depth = intent === "drop" ? 2.8 : intent === "smash" ? 4.2 : 5.1;
@@ -412,18 +412,43 @@ export class Game {
       if (this.motion.intentDirection === "left") aim -= 0.5;
       else if (this.motion.intentDirection === "right") aim += 0.5;
       aim = clamp(aim, -2.2, 2.2);
+      power = clamp(
+        this.motion.power * 0.92 +
+          incomingSpeed / 140 -
+          Math.abs(timing) * 0.06,
+        0.15,
+        1,
+      );
+      this.fly.swingAttempted = false;
+    } else if (this.settings.opponentType === "fruitfly") {
+      // Engineered Embodiment: Outgoing direction derived from physical racket contact point,
+      // steering torque, and neural descending power without Classic AI heuristics
+      const contactOffsetX = s.p.x - this.fly.racketPos.x;
+      const flyMotor = this.fly.lastMotorCommand;
+      aim = clamp(
+        contactOffsetX * 2.2 +
+          (flyMotor.steerTorque || 0) * 0.8 +
+          this.fly.x * 0.15,
+        -2.0,
+        2.0,
+      );
+      power = clamp(flyMotor.swingPower || 0.55, 0.35, 0.9);
     } else {
+      // Classic AI heuristic aiming
       aim = clamp(
         -this.playerPos.x * 0.25 + (this.random() - 0.5) * 2.5,
         -1.8,
         1.8,
       );
+      power = 0.55;
     }
 
     const error =
       side === 0
         ? 0
-        : C.ai[this.settings.difficulty].error * (this.random() - 0.5);
+        : this.settings.opponentType === "fruitfly"
+          ? 0
+          : C.ai[this.settings.difficulty].error * (this.random() - 0.5);
     const target = v(aim + error, 0.03, sign * depth);
 
     if (intent === "smash" && s.p.y < 2.3) intent = "drive";

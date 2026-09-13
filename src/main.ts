@@ -197,8 +197,25 @@ try {
   // Initialize Drosophila connectome simulation
   void game.fly.init(true, "/data/connectome").then(() => {
     const g = game.fly.bridge.getConnectomeGraph();
-    if (g && brainRenderer) {
-      brainRenderer.setGraph(g);
+    if (g) {
+      if (brainRenderer) brainRenderer.setGraph(g);
+      const isReal = g.manifest.provenance === "malecns-real";
+      const caption = $("#home-caption");
+      if (caption) {
+        if (isReal) {
+          caption.innerHTML = `
+            <span>REAL MALECNS v1.0 CONNECTOME</span>
+            <b>${g.manifest.synapseCount.toLocaleString()} Biological Synapses.<br>${g.manifest.neuronCount.toLocaleString()} Real Neurons.</b>
+            <small>OFFICIAL JANELIA MALECNS v1.0 / REAL CONNECTIVITY / LIF SIMULATION</small>
+          `;
+        } else {
+          caption.innerHTML = `
+            <span>DEVELOPER TEST GRAPH</span>
+            <b>NOT MALECNS DATA</b>
+            <small>TEST FIXTURE ONLY</small>
+          `;
+        }
+      }
     }
   });
 } catch (err) {
@@ -359,9 +376,9 @@ let silencedDNb = false;
 
 function updateInterventions() {
   const silencedTypes: string[] = [];
-  if (silencedLC) silencedTypes.push("LC4", "LC6", "LPLC2");
+  if (silencedLC) silencedTypes.push("LC4", "LC6", "LPLC");
   if (silencedDNa) silencedTypes.push("DNa01", "DNa02");
-  if (silencedDNb) silencedTypes.push("DNb01", "GiantFiber");
+  if (silencedDNb) silencedTypes.push("DNb01", "DNp01");
 
   game.fly.bridge.applyInterventions({
     silencedTypes,
@@ -374,16 +391,40 @@ $("#silence-lc4").addEventListener("click", () => {
   silencedLC = !silencedLC;
   $("#silence-lc4").classList.toggle("silenced", silencedLC);
   updateInterventions();
+  const matched =
+    game.fly.bridge.getEngine()?.interventions.getMatchedNeuronsForType("LC4")
+      ?.bodyIds || [];
+  toast(
+    silencedLC
+      ? `Silenced LC4/6 (${matched.length} MaleCNS neurons)`
+      : "Restored LC4/6 Looming",
+  );
 });
 $("#silence-dna").addEventListener("click", () => {
   silencedDNa = !silencedDNa;
   $("#silence-dna").classList.toggle("silenced", silencedDNa);
   updateInterventions();
+  const matched =
+    game.fly.bridge.getEngine()?.interventions.getMatchedNeuronsForType("DNa02")
+      ?.bodyIds || [];
+  toast(
+    silencedDNa
+      ? `Silenced DNa02 Steering (${matched.length} neurons: ${matched.join(", ")})`
+      : "Restored DNa02 Steering",
+  );
 });
 $("#silence-dnb").addEventListener("click", () => {
   silencedDNb = !silencedDNb;
   $("#silence-dnb").classList.toggle("silenced", silencedDNb);
   updateInterventions();
+  const matched =
+    game.fly.bridge.getEngine()?.interventions.getMatchedNeuronsForType("DNb01")
+      ?.bodyIds || [];
+  toast(
+    silencedDNb
+      ? `Silenced DNb01 Strike (${matched.length} neurons: ${matched.join(", ")})`
+      : "Restored DNb01 Strike",
+  );
 });
 
 $("#slider-gain").addEventListener("input", (e) => {

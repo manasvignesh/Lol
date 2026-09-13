@@ -1,4 +1,5 @@
 import type {
+  ActivePathwayNode,
   ConnectomeCSRGraph,
   FlyMotorCommand,
   FlySensoryFeatures,
@@ -47,16 +48,24 @@ export class NeuralEngine {
   private simTimeMs = 0;
   private activeSpikesInStep = 0;
   private lastMotorCommand: FlyMotorCommand;
+  private rngState: number | null = null;
+
+  public params: LIFParams;
 
   constructor(
     public readonly graph: ConnectomeCSRGraph,
-    public params: LIFParams = { ...DEFAULT_LIF_PARAMS },
+    params?: Partial<LIFParams>,
   ) {
+    this.params = { ...DEFAULT_LIF_PARAMS, ...params };
     this.numNeurons = graph.neurons.length;
     this.pathways = new PathwayRegistry(graph);
     this.interventions = new InterventionsManager(graph, this.pathways);
     this.sensoryEncoder = new SensoryEncoder(this.pathways);
     this.motorDecoder = new MotorDecoder(this.pathways);
+
+    if (this.params.seed !== undefined) {
+      this.rngState = this.params.seed >>> 0 || 1;
+    }
 
     this.v = new Float32Array(this.numNeurons);
     this.gExc = new Float32Array(this.numNeurons);
@@ -78,6 +87,25 @@ export class NeuralEngine {
     };
 
     this.reset();
+  }
+
+  private nextRandom(): number {
+    if (this.rngState === null) {
+      return Math.random();
+    }
+    // Mulberry32 deterministic PRNG
+    let t = (this.rngState += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  setSeed(seed: number | null) {
+    if (seed !== null) {
+      this.rngState = seed >>> 0 || 1;
+    } else {
+      this.rngState = null;
+    }
   }
 
   reset() {
@@ -115,7 +143,7 @@ export class NeuralEngine {
       this.interventions.settings;
     const silenced = this.interventions.getMask();
 
-    // 1. Process sensory input
+    // 1. Process optical sensory input
     let features: FlySensoryFeatures;
     if (sensoryInput) {
       features = this.sensoryEncoder.extractFeatures(sensoryInput);
@@ -129,7 +157,7 @@ export class NeuralEngine {
     // Decay factors
     const decayExc = Math.exp(-dt / tauExc);
     const decayInh = Math.exp(-dt / tauInh);
-    const rateFilterAlpha = 1.0 - Math.exp(-dt / 40.0); // 40ms smoothing
+    const rateFilterAlpha = 1.0 - Math.exp(-dt / 40.0); // 40ms continuous rate filter
 
     // 2. LIF Membrane Integration
     for (let i = 0; i < this.numNeurons; i++) {
@@ -152,13 +180,13 @@ export class NeuralEngine {
       const vi = this.v[i];
       const iSyn = this.gExc[i] * (eExc - vi) + this.gInh[i] * (eInh - vi);
       const iLeak = vRest - vi;
-      const noise = (Math.random() - 0.5) * 2.0 * noiseStd;
+      const noise = (this.nextRandom() - 0.5) * 2.0 * noiseStd;
       const totalI = iLeak + iSyn + this.iExt[i] + backgroundDrive + noise;
 
       const dv = (dt / tauMembrane) * totalI;
       const nextV = vi + dv;
 
-      // Spike detection
+      // Spike emission upon threshold crossing
       if (nextV >= vThresh) {
         this.v[i] = vReset;
         this.spiking[i] = 1;
@@ -238,6 +266,78 @@ export class NeuralEngine {
   }
 
   /**
+   * Computes the strongest active real path from stimulated visual neurons to descending outputs.
+   */
+  computeActivePathway(): ActivePathwayNode[] {
+    const neurons = this.graph.neurons;
+    const indptr = this.graph.indptr;
+    const indices = this.graph.indices;
+    const weights = this.graph.weights;
+
+    // Find most active visual seed
+    let topVis = -1;
+    let maxVisRate = 0;
+    for (const id of [
+      ...this.pathways.index.lc4Left,
+      ...this.pathways.index.lc4Right,
+      ...this.pathways.index.lc6Left,
+      ...this.pathways.index.lc6Right,
+      ...this.pathways.index.lc10Left,
+      ...this.pathways.index.lc10Right,
+    ]) {
+      if (this.firingRates[id] > maxVisRate) {
+        maxVisRate = this.firingRates[id];
+        topVis = id;
+      }
+    }
+
+    if (topVis === -1 || maxVisRate < 2.0) {
+      return [];
+    }
+
+    const path: ActivePathwayNode[] = [];
+    let current = topVis;
+    const visited = new Set<number>();
+
+    for (let hop = 0; hop < 4; hop++) {
+      visited.add(current);
+      const n = neurons[current];
+      path.push({
+        index: current,
+        bodyId: n.bodyId,
+        type: n.type,
+        region: n.region,
+        rateHz: this.firingRates[current],
+      });
+
+      if (n.region === "Descending" || n.region === "VNC") {
+        break;
+      }
+
+      // Find strongest active downstream neighbor
+      const start = indptr[current];
+      const end = indptr[current + 1];
+      let bestNext = -1;
+      let bestScore = -1;
+
+      for (let k = start; k < end; k++) {
+        const post = indices[k];
+        if (visited.has(post)) continue;
+        const score = weights[k] * (this.firingRates[post] + 0.1);
+        if (score > bestScore) {
+          bestScore = score;
+          bestNext = post;
+        }
+      }
+
+      if (bestNext === -1) break;
+      current = bestNext;
+    }
+
+    return path;
+  }
+
+  /**
    * Generate lightweight telemetry snapshot for UI visualizer.
    */
   getTelemetry(fps: number = 60): NeuralTelemetrySnapshot {
@@ -263,12 +363,14 @@ export class NeuralEngine {
       const n = neurons[i];
       const rate = this.firingRates[i];
       items[i] = {
-        id: n.id,
+        index: n.index !== undefined ? n.index : i,
+        bodyId: n.bodyId,
         name: n.name,
         type: n.type,
         region: n.region,
         hemisphere: n.hemisphere,
         neurotransmitter: n.neurotransmitter,
+        pos: n.pos,
         v: this.v[i],
         spiking: this.spiking[i] === 1,
         firingRateHz: rate,
@@ -293,11 +395,15 @@ export class NeuralEngine {
     return {
       timeMs: this.simTimeMs,
       stepCount: this.stepCount,
+      provenance: this.graph.manifest.provenance || "malecns-real",
+      neuronCount: this.numNeurons,
+      synapseCount: this.graph.indices.length,
       neurons: items,
       regionActivity,
       sensoryFeatures: this.sensoryEncoder.getLastFeatures(),
       motorCommand: this.lastMotorCommand,
       activeSpikeCount: this.activeSpikesInStep,
+      activePathway: this.computeActivePathway(),
       fps,
     };
   }

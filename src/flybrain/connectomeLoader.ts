@@ -69,6 +69,12 @@ export class ConnectomeLoader {
     const weights = new Float32Array(weightsBuf);
     const signs = new Int8Array(signsBuf);
 
+    let biologicalWeights: Uint32Array | undefined;
+    const bioPath = path.join(resolvedDir, "biologicalWeights.bin");
+    if (fs.existsSync(bioPath)) {
+      biologicalWeights = new Uint32Array(toAB(fs.readFileSync(bioPath)));
+    }
+
     if (indptr.length !== neurons.length + 1) {
       throw new Error(
         `Connectome CSR validation failed: indptr length (${indptr.length}) != neurons.length + 1 (${neurons.length + 1})`,
@@ -81,6 +87,7 @@ export class ConnectomeLoader {
       indices,
       weights,
       signs,
+      biologicalWeights,
       manifest,
     };
 
@@ -137,6 +144,12 @@ export class ConnectomeLoader {
       const weights = new Float32Array(weightsBuf);
       const signs = new Int8Array(signsBuf);
 
+      let biologicalWeights: Uint32Array | undefined;
+      const bioPath = path.join(resolvedDir, "biologicalWeights.bin");
+      if (fs.existsSync(bioPath)) {
+        biologicalWeights = new Uint32Array(toAB(fs.readFileSync(bioPath)));
+      }
+
       if (indptr.length !== neurons.length + 1) {
         throw new Error(
           `Connectome CSR validation failed: indptr length (${indptr.length}) != neurons.length + 1 (${neurons.length + 1})`,
@@ -149,6 +162,7 @@ export class ConnectomeLoader {
         indices,
         weights,
         signs,
+        biologicalWeights,
         manifest,
       };
 

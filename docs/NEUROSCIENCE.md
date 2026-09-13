@@ -2,11 +2,11 @@
 
 ## 1. Executive Scientific Overview
 
-**Motion Badminton: Connectome Edition** integrates computational neuroscience with real-time physical interaction. The simulated opponent is driven not by heuristics or deep reinforcement learning heuristics dressed in biological terminology, but by an active **Leaky Integrate-and-Fire (LIF)** network simulation operating over the synaptic connectivity graph of the **Drosophila melanogaster Central Nervous System (Janelia MaleCNS v1.0)**.
+**Motion Badminton: Connectome Edition** integrates computational neuroscience with real-time physical interaction. The simulated opponent is driven by an active **Leaky Integrate-and-Fire (LIF)** network simulation operating over a genuine sensorimotor subgraph extracted from the **HHMI Janelia MaleCNS v1.0** dataset (`male-cns:v1.0`).
 
 ```
 +-----------------------------------------------------------------------------------+
-|                            Drosophila Connectome Pipeline                         |
+|                       MaleCNS v1.0 Drosophila Connectome Pipeline                 |
 +-----------------------------------------------------------------------------------+
 |  [ 3D Shuttle Kinematics ]                                                         |
 |         |                                                                         |
@@ -14,10 +14,10 @@
 |  [ Sensory Encoder ]  --->  Retinal Azimuth, Elevation, Looming Expansion (η)    |
 |         |                                                                         |
 |         v                                                                         |
-|  [ Optic Lobe VPNs ]  --->  LC4, LC6, LC10, LPLC2 (Lobula Columnar Receptive)     |
+|  [ Optic Lobe VPNs ]  --->  LC4, LC6, LC10a/b, LPLC1/2 (2,439 Neurons, 44,781 Syn)|
 |         |                                                                         |
 |         v                                                                         |
-|  [ Central Complex ]  --->  EPG Compass Ring Attractor, P-EN, P-FN, FB Columns    |
+|  [ Central Complex ]  --->  EPG Compass Ring Attractor, PEN, PFN, PFL1/2/3        |
 |         |                                                                         |
 |         v                                                                         |
 |  [ Premotor Hubs ]    --->  Lateral Accessory Lobe (LAL) & Reciprocal Inhibition   |
@@ -27,6 +27,9 @@
 |         |                                                                         |
 |         v                                                                         |
 |  [ Motor Decoder ]    --->  Continuous Flight Velocity (Vx, Vz) & Effector Swing  |
+|         |                                                                         |
+|         v                                                                         |
+|  [ Physical Embodiment] --> Continuous Swept Racket Collision & Kinematic Return   |
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -34,29 +37,32 @@
 
 ## 2. Connectome Circuit Architecture
 
-The Drosophila sensorimotor connectome subcircuit models the sensorimotor loop bridging visual perception to flight control:
+The Drosophila sensorimotor connectome subcircuit models the full sensorimotor loop bridging visual perception to flight control using 2,439 authentic MaleCNS neurons:
 
-### A. Visual Projection Neurons (Optic Lobe / Lobula Complex)
+### A. Visual Projection Neurons (Optic Lobe / Lobula Complex - 1,158 neurons)
 
 - **LC4 (Lobula Columnar 4)**: Specialized looming detectors. Responds non-linearly to the angular expansion rate ($\eta(t) = \theta \cdot \dot{\theta}$) of approaching objects, mediating rapid collision detection and evasive steering.
 - **LC6 (Lobula Columnar 6)**: Small looming and approaching target detectors with wide dendritic arborization, routing excitation into premotor takeoff and steering circuits.
-- **LC10 (Lobula Columnar 10)**: High-acuity retinotopic target-tracking neurons. Arranged in ipsilateral azimuthal receptive fields ($-80^\circ$ to $0^\circ$ on the left; $0^\circ$ to $+80^\circ$ on the right), encoding shuttle angular position.
-- **LPLC2 (Lobula Plate Lobula Columnar 2)**: Directionally tuned radial optical expansion detectors.
+- **LC10 (Lobula Columnar 10a/b/c/d)**: High-acuity retinotopic target-tracking visual projection neurons encoding shuttle angular azimuth and elevation.
+- **LPLC1 / LPLC2 (Lobula Plate Lobula Columnar)**: Directionally tuned radial optical expansion detectors.
 
-### B. Central Complex (CX) Compass & Path Integration
+### B. Central Complex (CX) Compass & Path Integration (138 neurons)
 
-- **EPG (Ellipsoid body - Protocerebral bridge - Gall)**: 16 wedge ring-attractor neurons forming an internal compass heading representation.
-- **Ring Inhibitory Interneurons (GABAergic)**: Mediate global feedback inhibition ensuring only a single localized bump of activity is sustained across the ring attractor.
-- **P-EN (Protocerebral bridge - Ellipsoid body - Noduli)**: Angular velocity integrators that receive asymmetric optic flow and shift the EPG heading bump left or right.
-- **P-FN & FB Columns (Fan-shaped Body)**: Columnar coordinate transformation neurons translating allocentric heading into egocentric motor steering vectors.
+- **EPG (Ellipsoid body - Protocerebral bridge - Gall)**: Ring-attractor compass neurons maintaining internal heading representation.
+- **PEN_a & PEN_b (Protocerebral bridge - Ellipsoid body - Noduli)**: Angular velocity integrators that shift the EPG heading bump left or right in response to rotational optic flow.
+- **PFN & PFL1/2/3 (Fan-shaped Body Columns)**: Columnar coordinate transformation neurons translating allocentric heading into egocentric motor steering vectors.
 
-### C. Premotor Hubs & Descending Pathways (Brain $\rightarrow$ VNC)
+### C. Premotor Hubs & Descending Pathways (Brain $\rightarrow$ VNC - 186 neurons)
 
-- **LAL (Lateral Accessory Lobe)**: Bilateral premotor routing hubs with reciprocal GABAergic cross-inhibition, enforcing decisive left vs. right steering selection without motor chatter.
+- **LAL (Lateral Accessory Lobe)**: Bilateral premotor routing hubs with reciprocal GABAergic cross-inhibition, enforcing decisive left vs. right steering selection.
 - **DNa01 & DNa02 (Descending Neurons a01/a02)**: Direct steering motor commands. Asymmetric population rate ($\Delta \text{DNa02} = \text{Rate}(\text{DNa02\_R}) - \text{Rate}(\text{DNa02\_L})$) drives lateral turning torque and velocity ($v_x$).
 - **DNp01 (Descending Neuron p01)**: Flight initiation and forward power acceleration ($v_z$), gating aerodynamic wing thrust.
 - **DNb01 & Giant Fiber (GF)**: High-threshold rapid motor strike triggers coordinating foreleg and wing strikes for racket contact.
 - **MDN (Moonwalker Descending Neurons)**: Deceleration, braking, and backward recovery.
+
+### D. VNC Motor System (255 neurons)
+
+- Effector motor pools and premotor interneurons governing flight trim, wing stroke amplitude, and racket strike actuation.
 
 ---
 
@@ -89,7 +95,7 @@ When pre-synaptic neuron $j$ emits an action potential at time $t_k$:
 $$g_{i,\text{exc}}(t_k^+) = g_{i,\text{exc}}(t_k^-) + w_{ji} \cdot G_{\text{syn}} \quad (\text{if } s_{ji} > 0)$$
 $$g_{i,\text{inh}}(t_k^+) = g_{i,\text{inh}}(t_k^-) + w_{ji} \cdot G_{\text{syn}} \quad (\text{if } s_{ji} < 0)$$
 
-Where $w_{ji}$ is the electron microscopy synapse count between neuron $j$ and $i$, $s_{ji} \in \{+1, -1\}$ is the neurotransmitter sign, and $G_{\text{syn}}$ is the global synaptic gain multiplier.
+Where $w_{ji}$ is the biological synapse count between neuron $j$ and $i$, $s_{ji} \in \{+1, -1\}$ is the neurotransmitter sign, and $G_{\text{syn}}$ is the global synaptic gain multiplier.
 
 ---
 
@@ -109,7 +115,7 @@ The 3D court position $(x_s, y_s, z_s)$ and velocity $(v_x, v_y, v_z)$ of the sh
 
 ---
 
-## 5. Descending Motor Decoding
+## 5. Descending Motor Decoding & Physical Contact Kinematics
 
 Descending neuron firing rates $R_i(t)$ (computed via causal exponential smoothing $\tau_{\text{rate}} = 40\text{ ms}$) are decoded into continuous kinematics:
 
@@ -120,6 +126,14 @@ Descending neuron firing rates $R_i(t)$ (computed via causal exponential smoothi
 3. **Racket Strike Trigger**:
    $$\text{Trigger Strike if } \max(R_{\text{DNb01}}, R_{\text{GF}}) > 18.0\text{ Hz} \text{ and } d < 2.4\text{ m}$$
 
+### Zero Proximity Shortcuts: True Swept Physical Contact
+
+Unlike synthetic games with proximity triggers, the fruit-fly opponent has **no proximity hit shortcuts**. A return requires:
+
+1. **Active Strike State**: The fly must trigger a strike stroke through descending motor output.
+2. **Physical Swept Collision**: The shuttle segment $(\vec{p}_{\text{prev}}, \vec{p})$ must physically intersect the swept cyber-racket segment $(\vec{r}_{\text{prev}}, \vec{r})$ within contact envelope radius ($0.65\text{ m}$).
+3. **Contact Kinematics**: The outgoing trajectory is computed directly from contact point offset, racket velocity vector, and descending motor power. If the fly misjudges timing or fails to steer in time, it misses the shot.
+
 ---
 
 ## 6. Scientific Honesty & Boundaries
@@ -128,8 +142,8 @@ To preserve strict scientific integrity, we explicitly demarcate empirical neuro
 
 | Component                        | Grounding                              | Description                                                                                                                 |
 | :------------------------------- | :------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
-| **Connectome Adjacency Graph**   | **Empirical Biological Data**          | Derived directly from HHMI Janelia MaleCNS v1.0 and FlyWire EM segmentations. Synapse counts and neuron IDs are authentic.  |
-| **Neurotransmitter Assignments** | **Empirical Prediction / Literature**  | Signs (+1 ACh, -1 GABA/Glu) derived from Janelia RNA-seq / machine learning neurotransmitter predictions.                   |
+| **Connectome Adjacency Graph**   | **Empirical Biological Data**          | Derived directly from HHMI Janelia MaleCNS v1.0 (`male-cns:v1.0`). Synapse counts and Janelia Body IDs are authentic.       |
+| **Neurotransmitter Assignments** | **Empirical Prediction / Literature**  | Signs (+1 ACh, -1 GABA/Glu) derived from Janelia EM predictions and validated annotations.                                  |
 | **LIF Neural Simulation**        | **Computational Approximation**        | Point-neuron Leaky Integrate-and-Fire model based on Shiu et al. (2024), abstracting multicompartmental dendritic geometry. |
 | **Sensory Encoder**              | **Biophysically Grounded Model**       | Maps 3D shuttle kinematics to known optical receptive fields and looming response curves ($\eta$).                          |
-| **Motor Embodiment**             | **Engineered Bio-Cybernetic Effector** | Maps descending motor population rates into badminton court navigation and cyber-racket strikes.                            |
+| **Motor Embodiment**             | **Engineered Bio-Cybernetic Effector** | Maps descending motor population rates into badminton court flight velocity and physical swept racket strikes.              |

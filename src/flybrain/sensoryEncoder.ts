@@ -20,7 +20,7 @@ export class SensoryEncoder {
   constructor(private readonly pathways: PathwayRegistry) {}
 
   /**
-   * Extract biologically relevant optical & kinematic features from 3D court state.
+   * Extract biologically grounded optical & kinematic features from 3D court state.
    */
   extractFeatures(input: FlySensoryInput): FlySensoryFeatures {
     const [sx, sy, sz] = input.shuttlePos;
@@ -59,7 +59,7 @@ export class SensoryEncoder {
     const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
     const retinalVelocityDegPerSec = (speed / dist) * (180 / Math.PI);
 
-    // Threat / urgency metric (higher when fast shuttle is heading directly toward fly court)
+    // Threat / urgency metric
     const incomingTrajectoryThreat = isApproaching
       ? Math.min(1.0, Math.max(0.0, (radialVel / 15.0) * (5.0 / dist)))
       : 0;
@@ -84,93 +84,89 @@ export class SensoryEncoder {
   }
 
   /**
-   * Injects external synaptic currents into visual projection and sensory neurons
-   * based on extracted optical features.
+   * Injects external synaptic currents into real MaleCNS visual projection neurons
+   * based on optical retinal features.
    */
   encode(features: FlySensoryFeatures, currentBuffer: Float32Array) {
-    const neurons = this.pathways.graph.neurons;
+    const {
+      lc4Left,
+      lc4Right,
+      lc6Left,
+      lc6Right,
+      lc10Left,
+      lc10Right,
+      lplcLeft,
+      lplcRight,
+      penLeft,
+      penRight,
+    } = this.pathways.index;
 
-    // 1. LC10 (Azimuth Small-Target Tracking Neurons)
-    // Active when shuttle is in view, with Gaussian angular tuning
-    const encodeLC10 = (id: number) => {
-      const n = neurons[id];
-      if (!n.receptiveField) return;
-      const rf = n.receptiveField;
-      const azCenter = (rf.azimuthMin + rf.azimuthMax) * 0.5;
-      const azWidth = (rf.azimuthMax - rf.azimuthMin) * 0.6;
-      const elCenter = (rf.elevationMin + rf.elevationMax) * 0.5;
-      const elWidth = (rf.elevationMax - rf.elevationMin) * 0.6;
+    // 1. LC10 (Small Target / Azimuth Tracking Visual Projection Neurons)
+    // Excited when shuttle is within the visual field, with ipsilateral azimuth weighting
+    if (features.distance < 15.0) {
+      const baseTrack = Math.min(
+        30.0,
+        (12.0 / Math.max(1.0, features.distance)) * 15.0,
+      );
 
-      const dAz = (features.azimuthDeg - azCenter) / azWidth;
-      const dEl = (features.elevationDeg - elCenter) / elWidth;
-      const gaussian = Math.exp(-(dAz * dAz + dEl * dEl));
-
-      // Current injection in pA/mV
-      if (features.distance < 14) {
-        currentBuffer[id] +=
-          gaussian *
-          22.0 *
-          Math.min(2.0, 4.0 / Math.max(1.0, features.distance));
-      }
-    };
-
-    this.pathways.index.lc10Left.forEach(encodeLC10);
-    this.pathways.index.lc10Right.forEach(encodeLC10);
-
-    // 2. LC4 & LC6 (Looming & Target Approach Neurons)
-    // Strong non-linear response to looming expansion rate eta(t)
-    if (features.isApproaching && features.loomingRate > 0.005) {
-      const loomingDrive = Math.min(45.0, features.loomingRate * 600.0);
-
-      // Distribute to Left or Right based on azimuth
-      if (features.azimuthDeg < 15) {
-        // Left hemisphere or centered
-        this.pathways.index.lc4Left.forEach((id) => {
-          currentBuffer[id] += loomingDrive * 1.2;
-        });
-        this.pathways.index.lc6Left.forEach((id) => {
-          currentBuffer[id] += loomingDrive * 0.9;
-        });
+      // Left hemisphere visual field tuning
+      const leftWeight = Math.max(
+        0.0,
+        Math.min(1.0, (20.0 - features.azimuthDeg) / 40.0),
+      );
+      if (leftWeight > 0.1) {
+        for (const id of lc10Left) {
+          currentBuffer[id] += baseTrack * leftWeight;
+        }
       }
 
-      if (features.azimuthDeg > -15) {
-        // Right hemisphere or centered
-        this.pathways.index.lc4Right.forEach((id) => {
-          currentBuffer[id] += loomingDrive * 1.2;
-        });
-        this.pathways.index.lc6Right.forEach((id) => {
-          currentBuffer[id] += loomingDrive * 0.9;
-        });
+      // Right hemisphere visual field tuning
+      const rightWeight = Math.max(
+        0.0,
+        Math.min(1.0, (features.azimuthDeg + 20.0) / 40.0),
+      );
+      if (rightWeight > 0.1) {
+        for (const id of lc10Right) {
+          currentBuffer[id] += baseTrack * rightWeight;
+        }
       }
     }
 
-    // 3. LPLC2 (Radial Expansion)
-    if (features.isApproaching && features.angularSizeDeg > 1.0) {
-      const expDrive = Math.min(30.0, features.angularSizeDeg * 6.0);
+    // 2. LC4 & LC6 (Looming Collision & Expansion VPNs)
+    // Non-linear acceleration response to looming expansion rate eta(t)
+    if (features.isApproaching && features.loomingRate > 0.003) {
+      const loomingDrive = Math.min(55.0, features.loomingRate * 800.0);
+
+      if (features.azimuthDeg <= 15) {
+        for (const id of lc4Left) currentBuffer[id] += loomingDrive * 1.3;
+        for (const id of lc6Left) currentBuffer[id] += loomingDrive * 1.0;
+      }
+      if (features.azimuthDeg >= -15) {
+        for (const id of lc4Right) currentBuffer[id] += loomingDrive * 1.3;
+        for (const id of lc6Right) currentBuffer[id] += loomingDrive * 1.0;
+      }
+    }
+
+    // 3. LPLC (Radial Expansion & Optic Flow)
+    if (features.isApproaching && features.angularSizeDeg > 0.8) {
+      const expDrive = Math.min(35.0, features.angularSizeDeg * 7.0);
       if (features.azimuthDeg <= 0) {
-        this.pathways.index.lplc2Left.forEach((id) => {
-          currentBuffer[id] += expDrive;
-        });
+        for (const id of lplcLeft) currentBuffer[id] += expDrive;
       }
       if (features.azimuthDeg >= 0) {
-        this.pathways.index.lplc2Right.forEach((id) => {
-          currentBuffer[id] += expDrive;
-        });
+        for (const id of lplcRight) currentBuffer[id] += expDrive;
       }
     }
 
     // 4. Central Complex Compass Integration (P-EN heading shifts from optical drift)
     const drift =
       features.retinalVelocityDegPerSec * (features.azimuthDeg < 0 ? -1 : 1);
-    if (Math.abs(drift) > 5) {
+    if (Math.abs(drift) > 4) {
+      const drive = Math.min(22.0, Math.abs(drift) * 0.2);
       if (drift < 0) {
-        this.pathways.index.penLeft.forEach((id) => {
-          currentBuffer[id] += Math.min(18.0, Math.abs(drift) * 0.15);
-        });
+        for (const id of penLeft) currentBuffer[id] += drive;
       } else {
-        this.pathways.index.penRight.forEach((id) => {
-          currentBuffer[id] += Math.min(18.0, Math.abs(drift) * 0.15);
-        });
+        for (const id of penRight) currentBuffer[id] += drive;
       }
     }
   }

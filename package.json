@@ -16,7 +16,9 @@
     "format": "prettier --write src tests scripts docs *.json *.ts *.html *.md",
     "format:check": "prettier --check src tests scripts docs *.json *.ts *.html *.md",
     "typecheck": "tsc --noEmit",
-    "setup": "node scripts/setup-assets.mjs"
+    "setup": "node scripts/setup-assets.mjs",
+    "setup:connectome": "node scripts/setup-connectome.mjs",
+    "validate:connectome": "node scripts/validate-connectome.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.22-rc.20250304",

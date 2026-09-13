@@ -1,15 +1,15 @@
 import type { ConnectomeCSRGraph, NeuronData, NeuropilRegion } from "./types";
 
 export interface PathwayIndex {
-  // Visual Projection Neurons
+  // Visual Projection Neurons (VPNs)
   lc4Left: number[];
   lc4Right: number[];
   lc6Left: number[];
   lc6Right: number[];
   lc10Left: number[];
   lc10Right: number[];
-  lplc2Left: number[];
-  lplc2Right: number[];
+  lplcLeft: number[];
+  lplcRight: number[];
 
   // Central Complex Compass & Navigation
   epg: number[];
@@ -17,11 +17,8 @@ export interface PathwayIndex {
   penRight: number[];
   pfnLeft: number[];
   pfnRight: number[];
-  fb: number[];
-
-  // Premotor Hubs
-  lalLeft: number[];
-  lalRight: number[];
+  pflLeft: number[];
+  pflRight: number[];
 
   // Descending Sensorimotor Pathways
   dna01Left: number[];
@@ -31,22 +28,17 @@ export interface PathwayIndex {
   dnp01: number[];
   dnb01Left: number[];
   dnb01Right: number[];
-  giantFiberLeft: number[];
-  giantFiberRight: number[];
   mdnLeft: number[];
   mdnRight: number[];
+  allDescending: number[];
 
-  // Motor effectors
-  motorSteerLeft: number[];
-  motorSteerRight: number[];
-  motorThrust: number[];
-  motorStrikeForehand: number[];
-  motorStrikeBackhand: number[];
-  motorBrake: number[];
+  // VNC Motor effectors
+  vncMotor: number[];
 
-  // Region index maps
+  // Region and type index maps
   byRegion: Record<NeuropilRegion, number[]>;
   byType: Map<string, number[]>;
+  bodyIdToIndex: Map<string, number>;
 }
 
 export class PathwayRegistry {
@@ -64,16 +56,15 @@ export class PathwayRegistry {
       lc6Right: [],
       lc10Left: [],
       lc10Right: [],
-      lplc2Left: [],
-      lplc2Right: [],
+      lplcLeft: [],
+      lplcRight: [],
       epg: [],
       penLeft: [],
       penRight: [],
       pfnLeft: [],
       pfnRight: [],
-      fb: [],
-      lalLeft: [],
-      lalRight: [],
+      pflLeft: [],
+      pflRight: [],
       dna01Left: [],
       dna01Right: [],
       dna02Left: [],
@@ -81,16 +72,10 @@ export class PathwayRegistry {
       dnp01: [],
       dnb01Left: [],
       dnb01Right: [],
-      giantFiberLeft: [],
-      giantFiberRight: [],
       mdnLeft: [],
       mdnRight: [],
-      motorSteerLeft: [],
-      motorSteerRight: [],
-      motorThrust: [],
-      motorStrikeForehand: [],
-      motorStrikeBackhand: [],
-      motorBrake: [],
+      allDescending: [],
+      vncMotor: [],
       byRegion: {
         OpticLobe: [],
         CentralComplex: [],
@@ -99,72 +84,85 @@ export class PathwayRegistry {
         VNC: [],
       },
       byType: new Map<string, number[]>(),
+      bodyIdToIndex: new Map<string, number>(),
     };
 
-    for (const n of neurons) {
+    for (let i = 0; i < neurons.length; i++) {
+      const n = neurons[i];
+      const neuronIndex = n.index !== undefined ? n.index : i;
+      const t = n.type || "";
+      const hemi = n.hemisphere || (n.pos[0] < 0 ? "L" : "R");
+
+      idx.bodyIdToIndex.set(n.bodyId, neuronIndex);
+
       // Region grouping
       if (idx.byRegion[n.region]) {
-        idx.byRegion[n.region].push(n.id);
+        idx.byRegion[n.region].push(neuronIndex);
       }
 
       // Type grouping
-      if (!idx.byType.has(n.type)) {
-        idx.byType.set(n.type, []);
+      if (!idx.byType.has(t)) {
+        idx.byType.set(t, []);
       }
-      idx.byType.get(n.type)!.push(n.id);
+      idx.byType.get(t)!.push(neuronIndex);
 
-      // Specific pathway mapping
-      if (n.type === "LC4") {
-        if (n.hemisphere === "L") idx.lc4Left.push(n.id);
-        else idx.lc4Right.push(n.id);
-      } else if (n.type === "LC6") {
-        if (n.hemisphere === "L") idx.lc6Left.push(n.id);
-        else idx.lc6Right.push(n.id);
-      } else if (n.type === "LC10") {
-        if (n.hemisphere === "L") idx.lc10Left.push(n.id);
-        else idx.lc10Right.push(n.id);
-      } else if (n.type === "LPLC2") {
-        if (n.hemisphere === "L") idx.lplc2Left.push(n.id);
-        else idx.lplc2Right.push(n.id);
-      } else if (n.type === "EPG") {
-        idx.epg.push(n.id);
-      } else if (n.type === "P-EN") {
-        if (n.hemisphere === "L") idx.penLeft.push(n.id);
-        else idx.penRight.push(n.id);
-      } else if (n.type === "P-FN") {
-        if (n.hemisphere === "L") idx.pfnLeft.push(n.id);
-        else idx.pfnRight.push(n.id);
-      } else if (n.type === "FB") {
-        idx.fb.push(n.id);
-      } else if (n.type === "LAL") {
-        if (n.hemisphere === "L") idx.lalLeft.push(n.id);
-        else idx.lalRight.push(n.id);
-      } else if (n.type === "DNa01") {
-        if (n.hemisphere === "L") idx.dna01Left.push(n.id);
-        else idx.dna01Right.push(n.id);
-      } else if (n.type === "DNa02") {
-        if (n.hemisphere === "L") idx.dna02Left.push(n.id);
-        else idx.dna02Right.push(n.id);
-      } else if (n.type === "DNp01") {
-        idx.dnp01.push(n.id);
-      } else if (n.type === "DNb01") {
-        if (n.hemisphere === "L") idx.dnb01Left.push(n.id);
-        else idx.dnb01Right.push(n.id);
-      } else if (n.type === "GiantFiber") {
-        if (n.hemisphere === "L") idx.giantFiberLeft.push(n.id);
-        else idx.giantFiberRight.push(n.id);
-      } else if (n.type === "MDN") {
-        if (n.hemisphere === "L") idx.mdnLeft.push(n.id);
-        else idx.mdnRight.push(n.id);
-      } else if (n.type === "MotorNeuron") {
-        if (n.name.includes("Steer_L")) idx.motorSteerLeft.push(n.id);
-        else if (n.name.includes("Steer_R")) idx.motorSteerRight.push(n.id);
-        else if (n.name.includes("Thrust")) idx.motorThrust.push(n.id);
-        else if (n.name.includes("Strike_Forehand"))
-          idx.motorStrikeForehand.push(n.id);
-        else if (n.name.includes("Strike_Backhand"))
-          idx.motorStrikeBackhand.push(n.id);
-        else if (n.name.includes("Brake")) idx.motorBrake.push(n.id);
+      // 1. Visual Projection Neurons
+      if (t === "LC4") {
+        if (hemi === "L") idx.lc4Left.push(neuronIndex);
+        else idx.lc4Right.push(neuronIndex);
+      } else if (t === "LC6") {
+        if (hemi === "L") idx.lc6Left.push(neuronIndex);
+        else idx.lc6Right.push(neuronIndex);
+      } else if (t.startsWith("LC10")) {
+        if (hemi === "L") idx.lc10Left.push(neuronIndex);
+        else idx.lc10Right.push(neuronIndex);
+      } else if (t.startsWith("LPLC")) {
+        if (hemi === "L") idx.lplcLeft.push(neuronIndex);
+        else idx.lplcRight.push(neuronIndex);
+      }
+
+      // 2. Central Complex
+      else if (t.startsWith("EPG")) {
+        idx.epg.push(neuronIndex);
+      } else if (t.startsWith("PEN")) {
+        if (hemi === "L") idx.penLeft.push(neuronIndex);
+        else idx.penRight.push(neuronIndex);
+      } else if (t.startsWith("PFN")) {
+        if (hemi === "L") idx.pfnLeft.push(neuronIndex);
+        else idx.pfnRight.push(neuronIndex);
+      } else if (t.startsWith("PFL")) {
+        if (hemi === "L") idx.pflLeft.push(neuronIndex);
+        else idx.pflRight.push(neuronIndex);
+      }
+
+      // 3. Descending Channels
+      if (
+        n.region === "Descending" ||
+        n.superclass === "descending_neuron" ||
+        t.startsWith("DN")
+      ) {
+        idx.allDescending.push(neuronIndex);
+
+        if (t === "DNa01") {
+          if (hemi === "L") idx.dna01Left.push(neuronIndex);
+          else idx.dna01Right.push(neuronIndex);
+        } else if (t === "DNa02") {
+          if (hemi === "L") idx.dna02Left.push(neuronIndex);
+          else idx.dna02Right.push(neuronIndex);
+        } else if (t === "DNp01") {
+          idx.dnp01.push(neuronIndex);
+        } else if (t === "DNb01") {
+          if (hemi === "L") idx.dnb01Left.push(neuronIndex);
+          else idx.dnb01Right.push(neuronIndex);
+        } else if (t === "MDN") {
+          if (hemi === "L") idx.mdnLeft.push(neuronIndex);
+          else idx.mdnRight.push(neuronIndex);
+        }
+      }
+
+      // 4. VNC Motor Effectors
+      if (n.region === "VNC" || n.superclass === "vnc_motor") {
+        idx.vncMotor.push(neuronIndex);
       }
     }
 

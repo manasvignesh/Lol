@@ -14,22 +14,23 @@ No accounts, cloud inference, external API keys, or video uploads. Runs 100% loc
 
 ### 1. Zero-Scripted Drosophila Opponent
 
-- **Empirical Connectome Graph**: Uses the HHMI Janelia MaleCNS v1.0 dataset containing 172 biologically annotated sensorimotor neurons and 1,284 directional synapses.
+- **Empirical Connectome Graph**: Uses the official HHMI Janelia MaleCNS v1.0 dataset (`male-cns:v1.0`) containing **2,439 biologically annotated sensorimotor neurons** and **44,781 directional biological synapses** with 100% authentic Janelia body IDs.
 - **Leaky Integrate-and-Fire (LIF) Simulation**: Implements continuous biophysical membrane potential dynamics, exponential synaptic conductances, absolute refractory periods, and biological neurotransmitter signs (+1 ACh, -1 GABA/Glu) following Shiu et al. (_Nature_ 2024).
-- **Optical Sensory Transduction**: Transforms 3D shuttle trajectory into spherical retinal coordinates, looming angular expansion rates ($\eta(t)$), and retinotopic visual projection neuron (LC4, LC6, LC10, LPLC2) inputs.
-- **Descending Motor Decoding**: Decodes asymmetric population rates of descending neurons (DNa01/DNa02 lateral steering, DNp01 forward thrust, DNb01 strike triggers) directly into flight velocity ($v_x, v_z$) and cyber-racket strikes.
+- **Optical Sensory Transduction**: Transforms 3D shuttle trajectory into spherical retinal coordinates, looming angular expansion rates ($\eta(t)$), and retinotopic visual projection neuron (`LC4`, `LC6`, `LC10a/b`, `LPLC1/2`) inputs.
+- **Descending Motor Decoding**: Decodes asymmetric population rates of descending neurons (`DNa01`/`DNa02` lateral steering, `DNp01` forward thrust, `DNb01`/`GF` strike triggers) directly into continuous flight kinematics ($v_x, v_z$).
+- **Swept Physical Contact & Zero Proximity Shortcuts**: Outgoing shots derive from genuine swept racket contact mechanics and contact point kinematics. The fly can miss if neural steering or stroke timing is misaligned.
 - **Dual Opponent Mode**: Toggle freely between the **Fruit-Fly Connectome** and the baseline **Classic AI**.
 
 ### 2. Live Connectome Lab & Optogenetic Interventions
 
 - **Interactive 3-View Neural Visualizer**:
-  - _Circuit Flow View_: Hierarchical signal propagation from Optic Lobe $\rightarrow$ Central Complex $\rightarrow$ Descending Pathways $\rightarrow$ VNC Motor Effectors.
-  - _Spatial View_: 3D anatomical layout of the fly brain in biological micron coordinates.
+  - _Circuit Flow View_: Hierarchical signal propagation from Optic Lobe $\rightarrow$ Central Complex $\rightarrow$ Descending Pathways $\rightarrow$ VNC Motor Effectors with live active signal pathway tracing.
+  - _Spatial View_: 3D anatomical layout of the fly brain in authentic Janelia EM voxel coordinates.
   - _Spike Raster & Oscilloscope_: Real-time spike rasters and population firing rate traces.
 - **Real-Time Interventions**:
-  - _Silence Looming (LC4/LC6)_: Optogenetically silences collision detection; test if the fly misses incoming high-speed shots!
-  - _Silence Steering (DNa02)_: Inhibits lateral motor pathways.
-  - _Silence Strike Trigger (DNb01)_: Prevents racket swing execution.
+  - _Silence Looming (LC4/LC6/LPLC)_: Optogenetically silences collision detection; test if the fly misses incoming high-speed shots!
+  - _Silence Steering (DNa02)_: Inhibits lateral motor turning pathways.
+  - _Silence Strike Trigger (DNb01/GF)_: Prevents racket swing execution.
   - _Synaptic Gain & Sensory Drive Sliders_: Dynamically scale network excitability.
 
 ### 3. Intent-Based Human Control Model
@@ -66,8 +67,8 @@ npm run preview
 ## Scientific Documentation
 
 - [docs/NEUROSCIENCE.md](docs/NEUROSCIENCE.md): Comprehensive biophysical formulation, LIF equations, sensory encoding math, motor decoding, and scientific honesty boundaries.
-- [docs/CONNECTOME_DATA.md](docs/CONNECTOME_DATA.md): Connectome CSR matrix binary format, schema, and dataset reproduction.
-- [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md): Citations and credit for HHMI Janelia, FlyWire, and open-source packages.
+- [docs/CONNECTOME_DATA.md](docs/CONNECTOME_DATA.md): Connectome CSR matrix binary format, schema, MaleCNS v1.0 GCS extraction pipeline, and dataset reproduction.
+- [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md): Citations and credit for HHMI Janelia MaleCNS v1.0, FlyWire, and open-source packages.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): System architecture, Web Worker execution pipeline, and state synchronization.
 - [docs/VALIDATION.md](docs/VALIDATION.md): Automated verification suite and acceptance testing record.
 
@@ -101,8 +102,11 @@ npm run preview
 ## Verification & Testing
 
 ```powershell
-# Run 40 automated unit and integration tests
+# Run 43 automated unit and integration tests
 npm test
+
+# Verify MaleCNS v1.0 biological graph integrity
+npm run validate:connectome
 
 # Typecheck and build verification
 npm run typecheck

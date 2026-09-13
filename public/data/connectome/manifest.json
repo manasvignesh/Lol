@@ -1,44 +1,49 @@
 {
-  "name": "Drosophila MaleCNS Sensorimotor Subcircuit v1.0",
-  "version": "1.0.0",
-  "source": "Janelia MaleCNS v1.0 / Shiu et al. Nature 2024 / FlyWire",
-  "neuronCount": 172,
-  "synapseCount": 1284,
-  "regions": {
-    "OpticLobe": 48,
-    "CentralComplex": 68,
-    "Protocerebrum": 24,
-    "Descending": 26,
-    "VNC": 6
-  },
-  "keyPathways": {
-    "loomingVPNs": [
+  "dataset": "MaleCNS",
+  "datasetVersion": "v1.0",
+  "source": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome",
+  "provenance": "malecns-real",
+  "graphType": "real-connectome-derived",
+  "extractionMode": "sensorimotor-subgraph",
+  "neuronCount": 2439,
+  "synapseCount": 44781,
+  "seedCount": 1089,
+  "generatedAt": "2026-09-13T04:48:01.648517+00:00",
+  "extractionParameters": {
+    "minSynapseWeight": 8,
+    "visualSeeds": [
       "LC4",
       "LC6",
+      "LC10a",
+      "LC10b",
+      "LPLC1",
       "LPLC2"
     ],
-    "targetAzimuthVPNs": [
-      "LC10"
-    ],
-    "compassIntegrators": [
+    "cxSeeds": [
       "EPG",
-      "P-EN",
-      "P-FN"
+      "PEN_a(PEN1)",
+      "PEN_b(PEN2)",
+      "PFL1",
+      "PFL2",
+      "PFL3"
     ],
-    "steeringDescending": [
+    "descendingSeeds": [
       "DNa01",
-      "DNa02"
-    ],
-    "forwardThrustDescending": [
-      "DNp01"
-    ],
-    "strikeDescending": [
+      "DNa02",
+      "DNp01",
       "DNb01",
-      "GiantFiber"
-    ],
-    "brakingDescending": [
       "MDN"
-    ]
+    ],
+    "vncSuperclass": "vnc_motor"
   },
-  "createdAt": "2026-09-12T20:49:44.690Z"
+  "pathwaySummary": {
+    "visualNeurons": 939,
+    "cxNeurons": 138,
+    "descendingNeurons": 186,
+    "vncMotorNeurons": 252,
+    "interneurons": 1448
+  },
+  "synapseToConductanceFactor": 0.08,
+  "indptrLength": 2440,
+  "indicesLength": 44781
 }
