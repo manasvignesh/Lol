@@ -4,7 +4,7 @@
 
 The connectome dataset utilized in this project is extracted directly from the official **HHMI Janelia Research Campus MaleCNS v1.0** dataset (`male-cns:v1.0`), as published by the FlyEM Project and Janelia Research Campus (Takemura et al., 2023; Shiu et al., _Nature_ 2024; Schlegel et al., _Nature_ 2024; Dorkenwald et al., _Nature_ 2024).
 
-The sensorimotor subcircuit comprises **2,439 biologically validated neurons** and **44,781 directional biological synapses** with 100% authentic Janelia body IDs (e.g. `10001`, `10014`, `10051`), standard cell types, hemilineages, and EM voxel soma coordinates.
+The sensorimotor subcircuit comprises **2,439 biologically validated neurons** and **44,781 directional biological edges** (**1,146,043 biological synapses**) with 100% authentic Janelia body IDs (e.g. `10001`, `10014`, `10051`), standard cell types, hemilineages, and EM voxel soma coordinates.
 
 ### Subcircuit Composition
 
@@ -92,7 +92,9 @@ Checks performed:
 
 - Provenance flag is `"malecns-real"` and dataset is `"MaleCNS"`.
 - 100% of neurons have numeric Janelia body IDs with zero synthetic names.
-- CSR row offsets are strictly monotonically non-decreasing and terminate at `synapseCount`.
+- CSR row offsets are strictly monotonically non-decreasing and terminate at `edgeCount` (44,781).
+- Total biological synaptic contacts equal `biologicalSynapseTotal` (1,146,043).
 - All synaptic weights are strictly positive and finite.
 - Neurotransmitter signs are strictly within $\{-1, 0, +1\}$.
 - Key sensorimotor populations (`LC4`, `LC6`, `LC10`, `EPG`, `DNa02`, `DNp01`, `DNb01`, `vnc_motor`) are present with verified biological connectivity.
+- Direct source table verification: 100% of body IDs and edges match raw MaleCNS v1.0 feather tables with verified SHA-256 digests.

@@ -14,7 +14,7 @@ No accounts, cloud inference, external API keys, or video uploads. Runs 100% loc
 
 ### 1. Zero-Scripted Drosophila Opponent
 
-- **Empirical Connectome Graph**: Uses the official HHMI Janelia MaleCNS v1.0 dataset (`male-cns:v1.0`) containing **2,439 biologically annotated sensorimotor neurons** and **44,781 directional biological synapses** with 100% authentic Janelia body IDs.
+- **Empirical Connectome Graph**: Uses the official HHMI Janelia MaleCNS v1.0 dataset (`male-cns:v1.0`) containing **2,439 biologically annotated sensorimotor neurons** and **44,781 directional biological edges** (**1,146,043 biological synapses**) with 100% authentic Janelia body IDs.
 - **Leaky Integrate-and-Fire (LIF) Simulation**: Implements continuous biophysical membrane potential dynamics, exponential synaptic conductances, absolute refractory periods, and biological neurotransmitter signs (+1 ACh, -1 GABA/Glu) following Shiu et al. (_Nature_ 2024).
 - **Optical Sensory Transduction**: Transforms 3D shuttle trajectory into spherical retinal coordinates, looming angular expansion rates ($\eta(t)$), and retinotopic visual projection neuron (`LC4`, `LC6`, `LC10a/b`, `LPLC1/2`) inputs.
 - **Descending Motor Decoding**: Decodes asymmetric population rates of descending neurons (`DNa01`/`DNa02` lateral steering, `DNp01` forward thrust, `DNb01`/`GF` strike triggers) directly into continuous flight kinematics ($v_x, v_z$).

@@ -1,5 +1,6 @@
 import type {
   ActivePathwayNode,
+  BiologicalMotorSignals,
   ConnectomeCSRGraph,
   FlyMotorCommand,
   FlySensoryFeatures,
@@ -14,6 +15,7 @@ import { PathwayRegistry } from "./pathwayRegistry";
 import { InterventionsManager } from "./interventions";
 import { SensoryEncoder } from "./sensoryEncoder";
 import { MotorDecoder } from "./motorDecoder";
+import { EmbodimentAdapter } from "./embodimentAdapter";
 
 export const DEFAULT_LIF_PARAMS: LIFParams = {
   vRest: -65.0, // mV
@@ -34,6 +36,7 @@ export class NeuralEngine {
   readonly interventions: InterventionsManager;
   readonly sensoryEncoder: SensoryEncoder;
   readonly motorDecoder: MotorDecoder;
+  readonly embodimentAdapter: EmbodimentAdapter;
 
   readonly numNeurons: number;
   readonly v: Float32Array;
@@ -62,6 +65,7 @@ export class NeuralEngine {
     this.interventions = new InterventionsManager(graph, this.pathways);
     this.sensoryEncoder = new SensoryEncoder(this.pathways);
     this.motorDecoder = new MotorDecoder(this.pathways);
+    this.embodimentAdapter = new EmbodimentAdapter();
 
     if (this.params.seed !== undefined) {
       this.rngState = this.params.seed >>> 0 || 1;
@@ -120,6 +124,7 @@ export class NeuralEngine {
     this.simTimeMs = 0;
     this.activeSpikesInStep = 0;
     this.motorDecoder.reset();
+    this.embodimentAdapter.reset();
   }
 
   /**
@@ -236,9 +241,12 @@ export class NeuralEngine {
       this.iExt[i] = 0;
     }
 
-    // 5. Decode motor commands
-    const motorCommand = this.motorDecoder.decode(
-      this.firingRates,
+    // 5. Pure biological motor decoding from MaleCNS descending firing rates
+    const bioSignals = this.motorDecoder.decode(this.firingRates);
+
+    // 6. Virtual badminton embodiment adaptation
+    const motorCommand = this.embodimentAdapter.adapt(
+      bioSignals,
       features,
       dt * 0.001,
     );
@@ -367,10 +375,12 @@ export class NeuralEngine {
         bodyId: n.bodyId,
         name: n.name,
         type: n.type,
+        instance: n.instance,
         region: n.region,
         hemisphere: n.hemisphere,
         neurotransmitter: n.neurotransmitter,
         pos: n.pos,
+        coordinateType: n.coordinateType,
         v: this.v[i],
         spiking: this.spiking[i] === 1,
         firingRateHz: rate,
@@ -392,12 +402,21 @@ export class NeuralEngine {
       VNC: regionSums.VNC / Math.max(1, regionCounts.VNC),
     };
 
+    const edgeCount = this.graph.indices.length;
+    const biologicalSynapseTotal =
+      this.graph.manifest.biologicalSynapseTotal ??
+      (this.graph.biologicalWeights
+        ? this.graph.biologicalWeights.reduce((a, b) => a + b, 0)
+        : edgeCount);
+
     return {
       timeMs: this.simTimeMs,
       stepCount: this.stepCount,
       provenance: this.graph.manifest.provenance || "malecns-real",
       neuronCount: this.numNeurons,
-      synapseCount: this.graph.indices.length,
+      edgeCount,
+      biologicalSynapseTotal,
+      synapseCount: edgeCount, // Deprecated alias
       neurons: items,
       regionActivity,
       sensoryFeatures: this.sensoryEncoder.getLastFeatures(),

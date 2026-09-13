@@ -580,45 +580,60 @@ export class BrainRenderer {
         ? this.getSpatialScreenPos(item.index, w, h)
         : this.getNeuronScreenPos(item.index);
 
-    const tx = Math.min(w - 180, Math.max(10, pos.x + 10));
-    const ty = Math.min(h - 105, Math.max(10, pos.y - 30));
+    const boxW = 210;
+    const boxH = 104;
+    const tx = Math.min(w - (boxW + 10), Math.max(10, pos.x + 10));
+    const ty = Math.min(h - (boxH + 10), Math.max(10, pos.y - 30));
 
     ctx.fillStyle = "rgba(5, 12, 16, 0.95)";
-    ctx.fillRect(tx, ty, 175, 88);
+    ctx.fillRect(tx, ty, boxW, boxH);
     ctx.strokeStyle = "#45d0df";
     ctx.lineWidth = 1;
-    ctx.strokeRect(tx, ty, 175, 88);
+    ctx.strokeRect(tx, ty, boxW, boxH);
 
     ctx.fillStyle = "#45d0df";
     ctx.font = "bold 10px monospace";
-    ctx.fillText(`MaleCNS v1.0 [ID: ${item.bodyId}]`, tx + 8, ty + 16);
+    ctx.fillText(`MaleCNS v1.0 [ID: ${item.bodyId}]`, tx + 8, ty + 14);
 
     ctx.font = "9px monospace";
     ctx.fillStyle = "#ffffff";
+    const instStr = item.instance ? ` (${item.instance})` : "";
     ctx.fillText(
-      `Type: ${item.type} (${item.name.substring(0, 18)})`,
+      `Type: ${item.type}${instStr}`.substring(0, 32),
       tx + 8,
-      ty + 30,
+      ty + 28,
     );
 
     ctx.fillStyle = "#8ba3a8";
     ctx.fillText(
-      `Region: ${item.region} (${item.hemisphere || "unknown"})`,
+      `Region: ${item.region} | Hemi: ${item.hemisphere || "unknown"}`,
       tx + 8,
-      ty + 44,
+      ty + 42,
     );
     ctx.fillText(
       `Transmitter: ${item.neurotransmitter || "unclear"}`,
       tx + 8,
-      ty + 58,
+      ty + 56,
     );
+
+    const coordStr =
+      item.coordinateType === "soma_voxel"
+        ? "EM voxel soma (MaleCNS v1.0)"
+        : "Visualization coordinate: derived/fallback";
+    ctx.fillText(coordStr, tx + 8, ty + 70);
+
     ctx.fillText(
       `Vm: ${item.v.toFixed(1)} mV | Rate: ${item.firingRateHz.toFixed(1)} Hz`,
       tx + 8,
-      ty + 72,
+      ty + 84,
     );
-    ctx.fillStyle = item.spiking ? "#61e89b" : "#8ba3a8";
-    ctx.fillText(`Spike: ${item.spiking ? "ACTIVE" : "NO"}`, tx + 8, ty + 84);
+
+    ctx.fillStyle = item.spiking ? "#61e89b" : "#45d0df";
+    ctx.fillText(
+      `Spike: ${item.spiking ? "ACTIVE" : "RESTING"} | REAL CONNECTOME`,
+      tx + 8,
+      ty + 98,
+    );
   }
 
   private getNeuronScreenPos(idx: number): { x: number; y: number } {

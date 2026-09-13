@@ -44,6 +44,16 @@ export interface NeuronData {
   receptiveField?: ReceptiveField;
 }
 
+export interface BiologicalMotorSignals {
+  steeringTorque: number; // Decoded from DNa01, DNa02, PFL3 lateral rate asymmetry (-1.0 to 1.0)
+  forwardThrust: number; // Decoded from DNp01 and VNC motor firing rate (0.0 to 1.0)
+  brakingDrive: number; // Decoded from MDN firing rate (0.0 to 1.0)
+  turnImpulse: number; // Decoded from DNb01 flight-turning/saccade descending activity (0.0 to 1.0)
+  escapeActivation: number; // Decoded from DNp01 / Giant Fiber escape activity (0.0 to 1.0)
+  locomotorDrive: number; // Overall motor arousal / wing amplitude drive (0.0 to 1.0)
+  flightState: "HOVER" | "PURSUIT" | "MANEUVER" | "RECOVER";
+}
+
 export interface ConnectomeManifest {
   dataset: string; // "MaleCNS"
   datasetVersion: string; // "v1.0"
@@ -52,8 +62,15 @@ export interface ConnectomeManifest {
   graphType: string; // "real-connectome-derived"
   extractionMode: string; // "sensorimotor-subgraph"
   neuronCount: number;
-  synapseCount: number;
+  edgeCount: number; // Exact count of directed biological edges (e.g. 44,781)
+  biologicalSynapseTotal: number; // Total underlying biological synaptic contacts (e.g. 1,146,043)
+  synapseCount?: number; // Deprecated alias for edgeCount
   seedCount: number;
+  sourceHashes?: {
+    annotations?: string;
+    neurotransmitters?: string;
+    weights?: string;
+  };
   synapseToConductanceFactor?: number;
   generatedAt: string;
   extractionParameters?: {
@@ -63,12 +80,28 @@ export interface ConnectomeManifest {
     descendingSeeds: string[];
     vncSuperclass: string;
   };
+  populationCounts?: {
+    opticLobe: number;
+    centralComplex: number;
+    protocerebrum: number;
+    descending: number;
+    vncMotor: number;
+  };
+  seedCounts?: {
+    visualSeeds: number;
+    cxSeeds: number;
+    descendingSeeds: number;
+    totalDNsInDataset?: number;
+    vncMotorSeeds?: number;
+  };
   pathwaySummary?: {
-    visualNeurons: number;
-    cxNeurons: number;
-    descendingNeurons: number;
-    vncMotorNeurons: number;
-    interneurons: number;
+    opticLobeNeurons?: number;
+    centralComplexNeurons?: number;
+    descendingNeurons?: number;
+    vncMotorNeurons?: number;
+    interneurons?: number;
+    visualNeurons?: number;
+    cxNeurons?: number;
   };
 }
 
@@ -118,10 +151,13 @@ export interface FlySensoryFeatures {
 }
 
 export interface FlyMotorCommand {
+  // Pure biological decoding
+  biological?: BiologicalMotorSignals;
+  // Engineered badminton embodiment variables
   vx: number; // Lateral target velocity (-2.5 to 2.5 m/s)
   vz: number; // Longitudinal target velocity (-3.0 to 3.0 m/s)
   steerTorque: number; // Heading rotational torque
-  swingTriggered: boolean; // True if strike descending population fired
+  swingTriggered: boolean; // True if cyber-racket swing stroke triggered
   swingType: "forehand" | "backhand" | "overhead" | "lift";
   swingPower: number; // 0.0 to 1.0
   arousal: number; // 0.0 to 1.0 (wing buzzing / readiness)
@@ -133,10 +169,12 @@ export interface NeuronTelemetryItem {
   bodyId: string;
   name: string;
   type: string;
+  instance?: string | null;
   region: NeuropilRegion;
   hemisphere?: "L" | "R" | "bilateral" | "unknown" | null;
   neurotransmitter?: string | null;
   pos: [number, number, number];
+  coordinateType?: "soma_voxel" | "partner_centroid" | "neuropil_fallback";
   v: number; // membrane potential
   spiking: boolean;
   firingRateHz: number;
@@ -155,7 +193,9 @@ export interface NeuralTelemetrySnapshot {
   stepCount: number;
   provenance: ConnectomeProvenance;
   neuronCount: number;
-  synapseCount: number;
+  edgeCount: number;
+  biologicalSynapseTotal: number;
+  synapseCount?: number; // Deprecated alias
   neurons: NeuronTelemetryItem[];
   regionActivity: Record<NeuropilRegion, number>; // Mean firing rate per region in Hz
   sensoryFeatures: FlySensoryFeatures;

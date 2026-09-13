@@ -1,5 +1,36 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, createReadStream } from "node:fs";
 import { resolve, join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+
+function tryPythonValidation() {
+  const pyCandidates = [
+    resolve(process.cwd(), ".venv", "Scripts", "python.exe"),
+    resolve(process.cwd(), ".venv", "bin", "python"),
+    "python",
+    "python3",
+  ];
+
+  for (const py of pyCandidates) {
+    try {
+      const res = spawnSync(py, ["tools/connectome/validate_connectome.py"], {
+        stdio: "inherit",
+        cwd: process.cwd(),
+      });
+      if (res.status === 0) {
+        return true;
+      }
+    } catch {
+      // Continue to next candidate
+    }
+  }
+  return false;
+}
+
+function computeFileHash(filePath) {
+  const fileBuffer = readFileSync(filePath);
+  return createHash("sha256").update(fileBuffer).digest("hex");
+}
 
 function validateDir(dirPath) {
   const dir = resolve(process.cwd(), dirPath);
@@ -12,6 +43,7 @@ function validateDir(dirPath) {
   const indptrFile = join(dir, "indptr.bin");
   const indicesFile = join(dir, "indices.bin");
   const weightsFile = join(dir, "weights.bin");
+  const bioWeightsFile = join(dir, "biologicalWeights.bin");
   const signsFile = join(dir, "signs.bin");
 
   for (const f of [
@@ -20,6 +52,7 @@ function validateDir(dirPath) {
     indptrFile,
     indicesFile,
     weightsFile,
+    bioWeightsFile,
     signsFile,
   ]) {
     if (!existsSync(f)) {
@@ -35,6 +68,7 @@ function validateDir(dirPath) {
   const indptr = new Uint32Array(toAB(readFileSync(indptrFile)));
   const indices = new Uint32Array(toAB(readFileSync(indicesFile)));
   const weights = new Float32Array(toAB(readFileSync(weightsFile)));
+  const biologicalWeights = new Uint32Array(toAB(readFileSync(bioWeightsFile)));
   const signs = new Int8Array(toAB(readFileSync(signsFile)));
 
   const errors = [];
@@ -52,15 +86,25 @@ function validateDir(dirPath) {
 
   const nNeurons = neurons.length;
   const nEdges = indices.length;
+  const bioSynapsesTotal = biologicalWeights.reduce((acc, w) => acc + w, 0);
 
   if (manifest.neuronCount !== nNeurons) {
     errors.push(
       `Manifest neuronCount (${manifest.neuronCount}) != neurons.json length (${nNeurons})`,
     );
   }
-  if (manifest.synapseCount !== nEdges) {
+  const edgeCount = manifest.edgeCount ?? manifest.synapseCount;
+  if (edgeCount !== nEdges) {
     errors.push(
-      `Manifest synapseCount (${manifest.synapseCount}) != indices length (${nEdges})`,
+      `Manifest edgeCount (${edgeCount}) != indices length (${nEdges})`,
+    );
+  }
+  if (
+    manifest.biologicalSynapseTotal !== undefined &&
+    manifest.biologicalSynapseTotal !== bioSynapsesTotal
+  ) {
+    errors.push(
+      `Manifest biologicalSynapseTotal (${manifest.biologicalSynapseTotal}) != sum(biologicalWeights) (${bioSynapsesTotal})`,
     );
   }
   if (indptr.length !== nNeurons + 1) {
@@ -73,6 +117,11 @@ function validateDir(dirPath) {
       `weights length (${weights.length}) != indices length (${nEdges})`,
     );
   }
+  if (biologicalWeights.length !== nEdges) {
+    errors.push(
+      `biologicalWeights length (${biologicalWeights.length}) != indices length (${nEdges})`,
+    );
+  }
   if (signs.length !== nEdges) {
     errors.push(`signs length (${signs.length}) != indices length (${nEdges})`);
   }
@@ -83,6 +132,7 @@ function validateDir(dirPath) {
   let cxCount = 0;
   let descendingCount = 0;
   let vncCount = 0;
+  let protocerebrumCount = 0;
 
   for (let i = 0; i < nNeurons; i++) {
     const neuron = neurons[i];
@@ -121,6 +171,7 @@ function validateDir(dirPath) {
     else if (neuron.region === "CentralComplex") cxCount++;
     else if (neuron.region === "Descending") descendingCount++;
     else if (neuron.region === "VNC") vncCount++;
+    else if (neuron.region === "Protocerebrum") protocerebrumCount++;
   }
 
   if (indptr[0] !== 0) errors.push(`indptr[0] must be 0, got ${indptr[0]}`);
@@ -145,6 +196,12 @@ function validateDir(dirPath) {
       errors.push(`Invalid weight at edge ${e}: ${weights[e]}`);
       break;
     }
+    if (biologicalWeights[e] <= 0) {
+      errors.push(
+        `Invalid biological weight at edge ${e}: ${biologicalWeights[e]}`,
+      );
+      break;
+    }
     if (signs[e] !== -1 && signs[e] !== 0 && signs[e] !== 1) {
       errors.push(`Invalid sign at edge ${e}: ${signs[e]}`);
       break;
@@ -155,8 +212,11 @@ function validateDir(dirPath) {
     `Dataset          ${manifest.dataset} ${manifest.datasetVersion}`,
   );
   console.log(`Provenance       ${String(manifest.provenance).toUpperCase()}`);
-  console.log(`Neurons          ${nNeurons.toLocaleString()}`);
-  console.log(`Edges            ${nEdges.toLocaleString()}`);
+  console.log(`Real Neurons     ${nNeurons.toLocaleString()}`);
+  console.log(`Biological Edges ${nEdges.toLocaleString()}`);
+  console.log(
+    `Total Synapses   ${bioSynapsesTotal.toLocaleString()} biological synaptic contacts`,
+  );
   console.log();
   console.log(
     `Real body IDs    ${bodyIds.size.toLocaleString()} / ${nNeurons.toLocaleString()}`,
@@ -165,6 +225,7 @@ function validateDir(dirPath) {
   console.log();
   console.log(`Visual neurons   ${visualCount.toLocaleString()}`);
   console.log(`Central Complex  ${cxCount.toLocaleString()}`);
+  console.log(`Protocerebrum    ${protocerebrumCount.toLocaleString()}`);
   console.log(`Descending       ${descendingCount.toLocaleString()}`);
   console.log(`VNC motor        ${vncCount.toLocaleString()}`);
   console.log();
@@ -189,12 +250,13 @@ function validateDir(dirPath) {
   return true;
 }
 
-const dirs = ["data/connectome", "public/data/connectome"];
-let allOk = true;
-for (const d of dirs) {
-  if (!validateDir(d)) allOk = false;
-}
-
-if (!allOk) {
-  process.exit(1);
+if (!tryPythonValidation()) {
+  const dirs = ["data/connectome", "public/data/connectome"];
+  let allOk = true;
+  for (const d of dirs) {
+    if (!validateDir(d)) allOk = false;
+  }
+  if (!allOk) {
+    process.exit(1);
+  }
 }

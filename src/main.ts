@@ -203,10 +203,12 @@ try {
       const caption = $("#home-caption");
       if (caption) {
         if (isReal) {
+          const edgeCount = g.manifest.edgeCount ?? g.manifest.synapseCount;
+          const bioSynapses = g.manifest.biologicalSynapseTotal ?? edgeCount;
           caption.innerHTML = `
-            <span>REAL MALECNS v1.0 CONNECTOME</span>
-            <b>${g.manifest.synapseCount.toLocaleString()} Biological Synapses.<br>${g.manifest.neuronCount.toLocaleString()} Real Neurons.</b>
-            <small>OFFICIAL JANELIA MALECNS v1.0 / REAL CONNECTIVITY / LIF SIMULATION</small>
+            <span>REAL MALECNS-DERIVED CONNECTOME</span>
+            <b>${g.manifest.neuronCount.toLocaleString()} Real Neurons | ${edgeCount.toLocaleString()} Biological Edges.<br>${bioSynapses.toLocaleString()} Underlying Synaptic Contacts.</b>
+            <small>REAL CONNECTOME / SIMULATED LIF DYNAMICS</small>
           `;
         } else {
           caption.innerHTML = `

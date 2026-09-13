@@ -205,6 +205,32 @@ def extract_sensorimotor_subgraph(
             "sign": sign,
         })
 
+    # Compute source file hashes
+    import hashlib
+    def get_file_hash(p: Path) -> str:
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            while chunk := f.read(1024 * 1024):
+                h.update(chunk)
+        return h.hexdigest()
+
+    source_hashes = {
+        "annotations": get_file_hash(ann_path),
+        "neurotransmitters": get_file_hash(nt_path),
+        "weights": get_file_hash(weights_path),
+    }
+
+    # Reconcile exact population counts from neuron records
+    pop_counts = {
+        "opticLobe": sum(1 for n in neuron_records if n["region"] == "OpticLobe"),
+        "centralComplex": sum(1 for n in neuron_records if n["region"] == "CentralComplex"),
+        "protocerebrum": sum(1 for n in neuron_records if n["region"] == "Protocerebrum"),
+        "descending": sum(1 for n in neuron_records if n["region"] == "Descending"),
+        "vncMotor": sum(1 for n in neuron_records if n["region"] == "VNC"),
+    }
+
+    total_biological_synapses = sum(int(e["synapseCount"]) for e in edge_records)
+
     manifest = {
         "dataset": "MaleCNS",
         "datasetVersion": "v1.0",
@@ -213,8 +239,11 @@ def extract_sensorimotor_subgraph(
         "graphType": "real-connectome-derived",
         "extractionMode": "sensorimotor-subgraph",
         "neuronCount": len(neuron_records),
-        "synapseCount": len(edge_records),
+        "edgeCount": len(edge_records),
+        "biologicalSynapseTotal": total_biological_synapses,
+        "synapseCount": len(edge_records), # Deprecated alias maintained for backward compatibility
         "seedCount": len(core_seeds),
+        "sourceHashes": source_hashes,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "extractionParameters": {
             "minSynapseWeight": min_weight,
@@ -223,12 +252,20 @@ def extract_sensorimotor_subgraph(
             "descendingSeeds": dn_seeds,
             "vncSuperclass": "vnc_motor",
         },
+        "populationCounts": pop_counts,
+        "seedCounts": {
+            "visualSeeds": len(vis_bodies),
+            "cxSeeds": len(cx_bodies),
+            "descendingSeeds": len(dn_bodies),
+            "totalDNsInDataset": len(all_dn_bodies),
+            "vncMotorSeeds": len(vnc_bodies),
+        },
         "pathwaySummary": {
-            "visualNeurons": len(vis_bodies),
-            "cxNeurons": len(cx_bodies),
-            "descendingNeurons": len(active_dns),
-            "vncMotorNeurons": len(active_vnc),
-            "interneurons": len(interneurons),
+            "opticLobeNeurons": pop_counts["opticLobe"],
+            "centralComplexNeurons": pop_counts["centralComplex"],
+            "descendingNeurons": pop_counts["descending"],
+            "vncMotorNeurons": pop_counts["vncMotor"],
+            "interneurons": pop_counts["protocerebrum"],
         }
     }
 

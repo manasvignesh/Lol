@@ -86,6 +86,11 @@ export class SensoryEncoder {
   /**
    * Injects external synaptic currents into real MaleCNS visual projection neurons
    * based on optical retinal features.
+   *
+   * Biological rule: External visual currents stimulate exclusively genuine
+   * visual projection neuron populations (LC4, LC6, LC10a/b, LPLC1/2).
+   * Central Complex compass (EPG, P-EN) and Descending pathways receive excitation
+   * solely through downstream synaptic propagation across the biological connectome.
    */
   encode(features: FlySensoryFeatures, currentBuffer: Float32Array) {
     const {
@@ -97,8 +102,6 @@ export class SensoryEncoder {
       lc10Right,
       lplcLeft,
       lplcRight,
-      penLeft,
-      penRight,
     } = this.pathways.index;
 
     // 1. LC10 (Small Target / Azimuth Tracking Visual Projection Neurons)
@@ -155,18 +158,6 @@ export class SensoryEncoder {
       }
       if (features.azimuthDeg >= 0) {
         for (const id of lplcRight) currentBuffer[id] += expDrive;
-      }
-    }
-
-    // 4. Central Complex Compass Integration (P-EN heading shifts from optical drift)
-    const drift =
-      features.retinalVelocityDegPerSec * (features.azimuthDeg < 0 ? -1 : 1);
-    if (Math.abs(drift) > 4) {
-      const drive = Math.min(22.0, Math.abs(drift) * 0.2);
-      if (drift < 0) {
-        for (const id of penLeft) currentBuffer[id] += drive;
-      } else {
-        for (const id of penRight) currentBuffer[id] += drive;
       }
     }
   }

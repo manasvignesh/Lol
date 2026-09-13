@@ -14,7 +14,7 @@
 |  [ Sensory Encoder ]  --->  Retinal Azimuth, Elevation, Looming Expansion (η)    |
 |         |                                                                         |
 |         v                                                                         |
-|  [ Optic Lobe VPNs ]  --->  LC4, LC6, LC10a/b, LPLC1/2 (2,439 Neurons, 44,781 Syn)|
+|  [ Optic Lobe VPNs ]  --->  LC4, LC6, LC10a/b, LPLC1/2 (2,439 Neurons, 44,781 Edges)|
 |         |                                                                         |
 |         v                                                                         |
 |  [ Central Complex ]  --->  EPG Compass Ring Attractor, PEN, PFN, PFL1/2/3        |

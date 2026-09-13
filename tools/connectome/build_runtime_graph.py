@@ -27,7 +27,9 @@ def build_runtime_graph(raw_dir: Path, output_dirs: list[Path], min_weight: int 
     num_neurons = len(neurons)
     num_edges = len(edges)
 
-    print(f"Building CSR representation for {num_neurons:,} neurons and {num_edges:,} synapses...")
+    print(
+        f"Building CSR representation for {num_neurons:,} neurons, {num_edges:,} biological edges, and {manifest.get('biologicalSynapseTotal', 0):,} underlying biological synapses..."
+    )
 
     # Group outgoing edges by source index
     adj: list[list[dict]] = [[] for _ in range(num_neurons)]
