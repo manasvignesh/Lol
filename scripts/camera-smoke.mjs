@@ -61,12 +61,14 @@ try {
   await page.waitForFunction(() => window.motionDiagnostics.poseFps > 0, null, {
     timeout: 30000,
   });
-  await page.locator("#setup-start:not([disabled])").waitFor({ state: "visible", timeout: 20000 });
-  
+  await page
+    .locator("#setup-start:not([disabled])")
+    .waitFor({ state: "visible", timeout: 20000 });
+
   await page.screenshot({ path: "test-results/pose-detected.png" });
   const detected = await page.evaluate(() => window.motionDiagnostics);
   await page.evaluate(() => (window.cameraFixture.blank = true));
-  
+
   const missing = "Skipped missing check - no calibration required";
   await page.locator("#setup-cancel").click();
   const stopped = await page.evaluate(() => window.motionDiagnostics);

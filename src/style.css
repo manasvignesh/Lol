@@ -1503,7 +1503,7 @@ body.presentation-mode .embodiment-metric b {
   background: #000;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 #setup-video {
   width: 100%;
@@ -1515,7 +1515,7 @@ body.presentation-mode .embodiment-metric b {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   padding: 8px;
   font-size: 10px;
   color: #c5ed89;
@@ -1535,8 +1535,8 @@ body.presentation-mode .embodiment-metric b {
   font-size: 12px;
 }
 .setup-hand-toggle button {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 6px 16px;
   border-radius: 20px;
   color: #88a;

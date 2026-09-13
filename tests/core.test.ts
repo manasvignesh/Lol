@@ -86,14 +86,17 @@ describe("motion interpretation & intent", () => {
     expect(leftLean.intentWeight).toBeGreaterThan(0);
   });
 
-  it("rejects tracking gaps without a recovery velocity spike", () => {
+  it("tolerates short tracking gaps but resets on long ones", () => {
     const m = new MotionInterpreter();
     m.update(syntheticPose(), 1000);
     const invalid = syntheticPose();
     invalid[16].visibility = 0.1;
+    // Short gap: should be ignored, next frame calculates speed across gap
     expect(m.update(invalid, 1033)).toBeNull();
-    expect(m.update(syntheticPose(0.1, 0.2), 1100)!.speed).toBe(0);
-    expect(m.update(syntheticPose(0.7, 0.6), 2000)!.swing).toBe(false);
+    expect(m.update(syntheticPose(0.1, 0.2), 1100)!.speed).toBeGreaterThan(0);
+    // Long gap (> staleMs) should reset
+    expect(m.update(invalid, 1500)).toBeNull();
+    expect(m.update(syntheticPose(0.7, 0.6), 2000)!.speed).toBe(0);
   });
 
   it("does not turn whole-body translation into a swing", () => {
@@ -667,7 +670,7 @@ describe("match and connected rallies", () => {
       g.ready();
 
       // Hand wave far above or away from held shuttle
-      g.racket = v(-4.0, 3.0, 1.0); 
+      g.racket = v(-4.0, 3.0, 1.0);
       g.setMotion({
         ...neutralMotion(),
         racket: v(-4.0, 3.0, 1.0),
@@ -732,12 +735,25 @@ describe("match and connected rallies", () => {
     it("adds speed assist for fast shuttles (20 m/s)", () => {
       const g = new Game({ ...defaults, assist: "normal" });
       g.state = "rally";
-      g.shuttle = { p: v(0, 1.4, 3.4), prev: v(0, 1.4, 3.4), velocity: v(0, 0, 20), lastHit: 1 };
-      
-      const placeRacket = (tgtX: number, tgtY: number, tgtZ: number) => v(tgtX + 0.5, tgtY, tgtZ - 0.15);
-      g.racket = v(0.48, 1.4, 3.4); 
+      g.shuttle = {
+        p: v(0, 1.4, 3.4),
+        prev: v(0, 1.4, 3.4),
+        velocity: v(0, 0, 20),
+        lastHit: 1,
+      };
+
+      const placeRacket = (tgtX: number, tgtY: number, tgtZ: number) =>
+        v(tgtX + 0.5, tgtY, tgtZ - 0.15);
+      g.racket = v(0.48, 1.4, 3.4);
       g.previousRacket = v(0.48, 1.4, 3.4);
-      g.setMotion({ ...neutralMotion(), racket: placeRacket(0.48, 1.4, 3.4), confidence: 1, swing: true, swingId: 202, power: 0.8 });
+      g.setMotion({
+        ...neutralMotion(),
+        racket: placeRacket(0.48, 1.4, 3.4),
+        confidence: 1,
+        swing: true,
+        swingId: 202,
+        power: 0.8,
+      });
       for (let i = 0; i < 10; i++) g.step(1 / 120);
       expect(g.totalHits).toBe(1);
     });

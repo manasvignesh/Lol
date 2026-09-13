@@ -82,11 +82,12 @@ export const neutralMotion = (): Motion => ({
   phase: "none",
 });
 
-export function poseQuality(p: Pose | undefined) {
+export function poseQuality(p: Pose | undefined, rightHand = true) {
   if (!p || p.length < 33) return 0;
   // Hips (23, 24) are no longer strictly required for gameplay
+  const req = rightHand ? [11, 12, 14, 16] : [11, 12, 13, 15];
   return Math.min(
-    ...[11, 12, 13, 14, 15, 16].map((i) =>
+    ...req.map((i) =>
       Number.isFinite(p[i].x + p[i].y + p[i].z) ? (p[i].visibility ?? 0) : 0,
     ),
   );
@@ -285,11 +286,20 @@ export class MotionInterpreter {
     sensitivity = 1,
     movement = 1,
   ): Motion | null {
-    if (poseQuality(raw) < C.confidence) {
-      this.reset();
-      return null;
+    const isRight = this.calibration.hand === "right";
+
+    // 5. Short dropout tolerance: do not reset immediately
+    if (poseQuality(raw, isRight) < C.confidence) {
+      if (this.previousTime > 0 && time - this.previousTime > C.staleMs) {
+        this.reset();
+      }
+      return null; // Ignore frame but keep history/filter alive
     }
-    if (time - this.previousTime > C.staleMs) this.reset();
+
+    // If it's been too long since the last GOOD frame, reset anyway
+    if (this.previousTime > 0 && time - this.previousTime > C.staleMs) {
+      this.reset();
+    }
 
     const p = this.filter.update(raw, time);
     const c = this.calibration;
@@ -306,20 +316,19 @@ export class MotionInterpreter {
     // A smaller MediaPipe Z value means closer to the camera (forward).
     // We negate it so +Z is forward (away from body).
     const rawZ = -(w.z - s.z) / width;
-    
+
     // Apply temporal smoothing (Exponential Moving Average) to avoid phantom swings from Z jitter
-    this.smoothedZ = this.smoothedZ === 0 ? rawZ : this.smoothedZ + (rawZ - this.smoothedZ) * (1 - Math.exp(-dt * 15));
-    
+    this.smoothedZ =
+      this.smoothedZ === 0
+        ? rawZ
+        : this.smoothedZ + (rawZ - this.smoothedZ) * (1 - Math.exp(-dt * 15));
+
     // Apply a dead zone and clamp spikes
     let dz = this.smoothedZ;
     if (Math.abs(dz) < 0.1) dz = 0; // dead zone
     dz = clamp(dz, -2.5, 2.5); // clamp wild swings
-    
-    const relative = v(
-      -(w.x - s.x) / width,
-      -(w.y - s.y) / width,
-      dz
-    );
+
+    const relative = v(-(w.x - s.x) / width, -(w.y - s.y) / width, dz);
     let velocity = this.previousWrist
       ? mul(sub(relative, this.previousWrist), 1 / dt)
       : v();
@@ -463,9 +472,9 @@ export class CalibrationManager {
     p: Pose | undefined,
     dt: number,
   ): { message: string; done?: Calibration } {
-    if (poseQuality(p) < C.confidence) {
+    if (poseQuality(p, this.hand === "right") < C.confidence) {
       this.held = 0;
-      return { message: "Keep shoulders, elbows, wrists and hips in frame." };
+      return { message: "Keep shoulders, elbows, and racket wrist in frame." };
     }
     const pose = p!;
     const width = shoulderWidth(pose);

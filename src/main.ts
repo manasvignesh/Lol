@@ -100,7 +100,7 @@ $("#app").innerHTML = `
 <div id="home-caption">
   <span>REAL MALECNS-DERIVED CONNECTOME</span>
   <b id="home-caption-stats">2,439 Real Neurons · 44,781 Biological Edges.<br>1,146,043 Underlying Synaptic Contacts.</b>
-  <small>HHMI JANELIA MALECNS v1.0 / LEAKY INTEGRATE-AND-FIRE / ZERO SCRIPTING</small>
+  <small>HHMI JANELIA MALECNS v1.0 / LEAKY INTEGRATE-AND-FIRE / ENGINEERED EMBODIMENT</small>
 </div>
 
 <!-- SCIENCE INTRO SPLASH -->
@@ -145,6 +145,17 @@ $("#app").innerHTML = `
     <button id="setup-cancel" class="secondary">Back to home</button>
   </div>
 </section>
+
+<div id="camera-error-dialog" class="screen hidden dialog onboarding-card">
+  <div class="eyebrow">CAMERA ERROR</div>
+  <h2>Camera couldn't start</h2>
+  <p id="camera-error-msg">Please check your permissions and make sure no other app is using the camera.</p>
+  <div class="ob-actions">
+    <button id="camera-error-retry" class="primary">TRY AGAIN</button>
+    <button id="camera-error-another" class="secondary">CHOOSE ANOTHER CAMERA</button>
+    <button id="camera-error-keyboard" class="text-button">KEYBOARD MODE</button>
+  </div>
+</div>
 
 <div id="onboarding" class="screen hidden dialog onboarding-card">
   <div class="eyebrow" id="ob-step-label">STEP 1 OF 5</div>
@@ -516,8 +527,10 @@ function home() {
   setScreen("home");
 }
 
-function triggerScienceSplash() {
+function triggerScienceSplash(force = false) {
   if (settings.opponentType === "fruitfly") {
+    if (!force && localStorage.getItem("scienceIntroSeen") === "true") return;
+    localStorage.setItem("scienceIntroSeen", "true");
     const splash = $("#science-splash");
     splash.classList.remove("hidden");
     splash.classList.add("fade-in");
@@ -549,8 +562,10 @@ function startGame() {
   $("#keyboard-help").classList.toggle("hidden", mode !== "keyboard");
   $("#synthetic-shot-bar").classList.toggle("hidden", mode !== "keyboard");
 
-  // Keep brain panel open during game
-  toggleBrainPanel(true);
+  // Keep brain panel collapsed initially for first-time players
+  const hasSeenBrain = localStorage.getItem("brainPanelSeen") === "true";
+  toggleBrainPanel(hasSeenBrain);
+  localStorage.setItem("brainPanelSeen", "true");
 }
 
 async function openCameraSetup() {
@@ -562,7 +577,7 @@ async function openCameraSetup() {
   lastPose = null;
   lastGood = 0;
   previousPoseTime = 0;
-  
+
   setScreen("camera-setup");
   $<HTMLVideoElement>("#setup-video").srcObject = null;
   $("#setup-tracking-status").textContent = "● Connecting...";
@@ -575,8 +590,23 @@ async function openCameraSetup() {
     $("#setup-tracking-status").textContent = "● Camera ready";
     $<HTMLButtonElement>("#setup-start").disabled = false;
   } catch (e) {
-    home();
-    showError((e as Error).message);
+    setScreen("camera-error-dialog");
+    const err = e instanceof Error ? e.message : "Camera access denied";
+    $("#camera-error-msg").textContent = err;
+
+    // Bind buttons dynamically
+    $("#camera-error-retry").onclick = () => openCameraSetup();
+    $("#camera-error-another").onclick = async () => {
+      // Re-enter setup, attempt to populate cameras despite error (sometimes device enumeration still works)
+      setScreen("camera-setup");
+      await populateCameras();
+    };
+    $("#camera-error-keyboard").onclick = () => {
+      audio.unlock();
+      mode = "keyboard";
+      calibrated = true;
+      startGame();
+    };
   }
 }
 
@@ -609,7 +639,7 @@ $("#setup-start").addEventListener("click", () => {
     reach: 0.35,
     hand: explicitHand,
   };
-  
+
   if (!localStorage.getItem("onboardingCompleted")) {
     startOnboarding();
   } else {
@@ -621,11 +651,23 @@ $("#setup-cancel").addEventListener("click", home);
 
 let onboardingStep = 0;
 const onboardingData = [
-  { title: "Move", desc: "You don't need to walk around your room.<br>Lean slightly and the avatar handles court movement." },
-  { title: "Swing", desc: "Swing naturally with your racket hand.<br>You don't need perfect positioning." },
-  { title: "The Fly", desc: "Your opponent uses a MaleCNS-derived fruit-fly connectome simulation." },
-  { title: "Connectome Lab", desc: "Open this anytime to see the simulated neural activity driving the opponent." },
-  { title: "Ready", desc: "That's it. Keep the shuttle alive." }
+  {
+    title: "Move",
+    desc: "You don't need to walk around your room.<br>Lean slightly and the avatar handles court movement.",
+  },
+  {
+    title: "Swing",
+    desc: "Swing naturally with your racket hand.<br>You don't need perfect positioning.",
+  },
+  {
+    title: "The Fly",
+    desc: "Your opponent uses a MaleCNS-derived fruit-fly connectome simulation.",
+  },
+  {
+    title: "Connectome Lab",
+    desc: "Open this anytime to see the simulated neural activity driving the opponent.",
+  },
+  { title: "Ready", desc: "That's it. Keep the shuttle alive." },
 ];
 
 function startOnboarding() {
@@ -636,10 +678,11 @@ function startOnboarding() {
 
 function updateOnboardingUI() {
   const step = onboardingData[onboardingStep];
-  $("#ob-step-label").textContent = `STEP ${onboardingStep + 1} OF ${onboardingData.length}`;
+  $("#ob-step-label").textContent =
+    `STEP ${onboardingStep + 1} OF ${onboardingData.length}`;
   $("#ob-title").textContent = step.title;
   $("#ob-desc").innerHTML = step.desc;
-  
+
   if (onboardingStep === onboardingData.length - 1) {
     $("#ob-next").textContent = "PLAY";
   } else {
@@ -670,9 +713,8 @@ camera.onError = (message) => {
 camera.onPose = (pose, timestamp) => {
   lastPose = pose;
   const now = performance.now();
-  if (pose && poseQuality(pose)) {
+  if (pose && poseQuality(pose, interpreter.calibration.hand === "right")) {
     lastGood = now;
-    // Silent background calibration improvement can happen here in the future
   }
 
   if (screen === "game" && calibrated && pose) {
@@ -1083,7 +1125,7 @@ document.querySelectorAll(".shot-btn").forEach((btn) => {
 
 // UI Navigation listeners
 $("#play").addEventListener("click", () => void openCameraSetup());
-$("#how-it-works").addEventListener("click", triggerScienceSplash);
+$("#how-it-works").addEventListener("click", () => triggerScienceSplash(true));
 
 $("#keyboard").addEventListener("click", () => {
   audio.unlock();
@@ -1115,7 +1157,9 @@ $("#settings-toggle-advanced").addEventListener("click", () => {
   const adv = $("#settings-advanced");
   const isHidden = adv.classList.contains("hidden");
   adv.classList.toggle("hidden", !isHidden);
-  $("#settings-toggle-advanced").textContent = isHidden ? "Hide Advanced" : "Show Advanced";
+  $("#settings-toggle-advanced").textContent = isHidden
+    ? "Hide Advanced"
+    : "Show Advanced";
 });
 
 $("#settings-replay-tutorial").addEventListener("click", () => {

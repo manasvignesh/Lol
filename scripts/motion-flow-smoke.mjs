@@ -61,16 +61,18 @@ try {
       },
       { x, y, offset },
     );
-  page.on("console", msg => console.log("BROWSER:", msg.text()));
+  page.on("console", (msg) => console.log("BROWSER:", msg.text()));
   await setPose();
   await page.locator("#play").click();
-  await page.locator("#setup-start:not([disabled])").waitFor({ state: "visible" });
+  await page
+    .locator("#setup-start:not([disabled])")
+    .waitFor({ state: "visible" });
   await page.locator("#setup-start").click();
   await page.locator("#ob-skip").waitFor({ state: "visible" });
   await page.locator("#ob-skip").click();
 
   await page.locator("#pause").waitFor({ state: "visible" });
-  
+
   // Apply the calibration values the test previously achieved naturally
   await page.evaluate(() => {
     window.motionDiagnostics = window.motionDiagnostics || {}; // Ensure it exists
@@ -81,7 +83,7 @@ try {
         width: 0.1,
         range: 0.15,
         reach: 0.15,
-        hand: "right"
+        hand: "right",
       };
     }
   });

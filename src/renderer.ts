@@ -435,14 +435,14 @@ export class CourtRenderer {
         game.racket.z,
       );
       const incomingSpeed = len(game.shuttle.velocity);
-      const speedAssist = clamp((incomingSpeed - 8) / 12, 0, 1) * 0.10;
+      const speedAssist = clamp((incomingSpeed - 8) / 12, 0, 1) * 0.1;
       const baseRadius = C.racketBladeRadius[game.settings.assist] || 0.42;
       const rBlade = baseRadius + speedAssist;
       const depthScale = game.settings.assist === "beginner" ? 1.81 : 1.5;
       this.debugRacketSphere.scale.set(
         rBlade / 0.28,
         rBlade / 0.28,
-        (rBlade / depthScale) / 0.28
+        rBlade / depthScale / 0.28,
       );
     } else {
       this.debugRacketSphere.visible = false;

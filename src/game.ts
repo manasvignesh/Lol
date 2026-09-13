@@ -1,5 +1,15 @@
 import { C, type Settings } from "./config";
-import { clamp, len, v, mix, sweptDistance, type V3, add, sub, mul } from "./math";
+import {
+  clamp,
+  len,
+  v,
+  mix,
+  sweptDistance,
+  type V3,
+  add,
+  sub,
+  mul,
+} from "./math";
 import {
   integrate,
   inCourt,
@@ -82,13 +92,29 @@ export class Game {
   previousRacket = { ...this.racket };
   motion = neutralMotion();
   usedSwing = -1;
-  primedSwing: { id: number; intent: Intent; time: number } | null = null;
-  armedPrediction: { id: number; intent: Intent; time: number } | null = null;
+  primedSwing: {
+    id: number;
+    intent: Intent;
+    time: number;
+    swingStart: number;
+  } | null = null;
+  armedPrediction: {
+    id: number;
+    intent: Intent;
+    time: number;
+    swingStart: number;
+  } | null = null;
   lastHumanDiagnostic: HumanContactDiagnostic | null = null;
   lastContact = -10;
   events: GameEvent[] = [];
   lastShot = "READY";
-  history: { time: number; racket: V3; prevRacket: V3; shuttleP: V3; shuttlePrev: V3 }[] = [];
+  history: {
+    time: number;
+    racket: V3;
+    prevRacket: V3;
+    shuttleP: V3;
+    shuttlePrev: V3;
+  }[] = [];
 
   constructor(
     public settings: Settings,
@@ -264,48 +290,40 @@ export class Game {
           this.motion.swingId !== this.usedSwing;
 
         if (isConfirmedSwing) {
-          const visualRadius = C.racketBladeRadius[this.settings.assist] || 0.42;
-          const gameplayRadiusMult = this.settings.assist === "beginner" ? 2.4 : 1.2;
+          const visualRadius =
+            C.racketBladeRadius[this.settings.assist] || 0.42;
+          const gameplayRadiusMult =
+            this.settings.assist === "beginner" ? 2.0 : 1.2;
           const racketRadius = visualRadius * gameplayRadiusMult;
-          
-          const depthScale = this.settings.assist === "beginner" ? 1.81 : 1.5;
+
+          const depthScale = this.settings.assist === "beginner" ? 2.0 : 1.4;
           const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
-          
-          const lookaheadDt = 0.12; 
-          const racketVelPerFrame = sub(this.racket, this.previousRacket);
-          const racketFuture = add(this.racket, mul(racketVelPerFrame, lookaheadDt / C.dt));
-          
-          const contactNow = sweptDistance(
-            scaleP(this.previousRacket),
-            scaleP(this.racket),
-            scaleP(heldPos),
-            scaleP(heldPos),
-          );
-          
-          const contactPredicted = sweptDistance(
-            scaleP(this.racket),
-            scaleP(racketFuture),
-            scaleP(heldPos),
-            scaleP(heldPos),
-          );
 
-          let closestDistance = contactNow.distance;
-          let isPredictedHit = false;
-
-          if (contactPredicted.distance < contactNow.distance) {
-            closestDistance = contactPredicted.distance;
-            isPredictedHit = true;
+          let closestDistance = Infinity;
+          if (!this.history || this.history.length === 0) {
+            closestDistance = sweptDistance(
+              scaleP(this.previousRacket),
+              scaleP(this.racket),
+              scaleP(heldPos),
+              scaleP(heldPos),
+            ).distance;
+          } else {
+            for (let i = 0; i < this.history.length; i++) {
+              const frame = this.history[i];
+              if (this.time - frame.time > 0.15) continue;
+              // Ensure we only look at frames after the current swing started (approximated by swingId or simply allowing recent frames)
+              const d = sweptDistance(
+                scaleP(frame.prevRacket),
+                scaleP(frame.racket),
+                scaleP(heldPos),
+                scaleP(heldPos),
+              ).distance;
+              if (d < closestDistance) closestDistance = d;
+            }
           }
 
           if (closestDistance < racketRadius) {
             this.usedSwing = this.motion.swingId;
-            // Magnetism for serve
-            if (this.settings.assist === "beginner") {
-                const magnetismPoint = isPredictedHit ? this.racket : mix(this.racket, this.shuttle.p, 0.4);
-                if (len(sub(magnetismPoint, this.shuttle.p)) < visualRadius * 1.5) {
-                    this.shuttle.p = { ...magnetismPoint };
-                }
-            }
             this.hit(0, "serve");
           }
         }
@@ -350,6 +368,7 @@ export class Game {
         id: this.motion.swingId,
         intent: this.motion.intent,
         time: this.time,
+        swingStart: this.time, // Add swing start time to use for history buffer constraint
       };
       this.armedPrediction = null;
     } else if (
@@ -362,6 +381,7 @@ export class Game {
         id: this.motion.swingId,
         intent: this.motion.intent,
         time: this.time,
+        swingStart: this.time,
       };
     }
 
@@ -380,33 +400,44 @@ export class Game {
 
     // Keep history of racket and shuttle positions for latency tolerance
     if (!this.history) this.history = [];
-    this.history.push({ time: this.time, racket: { ...this.racket }, prevRacket: { ...this.previousRacket }, shuttleP: { ...s.p }, shuttlePrev: { ...s.prev } });
+    this.history.push({
+      time: this.time,
+      racket: { ...this.racket },
+      prevRacket: { ...this.previousRacket },
+      shuttleP: { ...s.p },
+      shuttlePrev: { ...s.prev },
+    });
     if (this.history.length > 20) this.history.shift();
 
     if (s.lastHit === 1 && s.p.z > -0.5) {
       // 1. EXPAND EFFECTIVE HIT ZONE
       const visualRadius = C.racketBladeRadius[this.settings.assist] || 0.42;
-      const gameplayRadiusMult = this.settings.assist === "beginner" ? 2.4 : 1.2;
+      const gameplayRadiusMult =
+        this.settings.assist === "beginner" ? 2.0 : 1.2;
       const racketRadius = visualRadius * gameplayRadiusMult;
 
-      const depthScale = this.settings.assist === "beginner" ? 1.8 : 1.4;
+      const depthScale = this.settings.assist === "beginner" ? 2.0 : 1.4;
       const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
 
       // 2. SHORT BUFFER LATENCY TOLERANCE
       // We check if the racket and shuttle intersected at ANY point in our recent ~150ms buffer
       let closestDistance = Infinity;
 
+      const allowedHistoryTime = this.primedSwing
+        ? this.primedSwing.swingStart - 0.15
+        : this.time - 0.15;
+
       for (let i = 0; i < this.history.length; i++) {
         const frame = this.history[i];
-        if (this.time - frame.time > 0.15) continue; // Only evaluate up to 150ms ago
-        
+        if (frame.time < allowedHistoryTime) continue; // Only evaluate up to 150ms before swing start
+
         const d = sweptDistance(
           scaleP(frame.prevRacket),
           scaleP(frame.racket),
           scaleP(frame.shuttlePrev),
-          scaleP(frame.shuttleP)
+          scaleP(frame.shuttleP),
         ).distance;
-        
+
         if (d < closestDistance) closestDistance = d;
       }
 
@@ -431,7 +462,7 @@ export class Game {
         this.primedSwing = null;
         this.armedPrediction = null;
         this.lastContact = this.time;
-        
+
         // Ensure visual effect for contact
         this.events.push({
           type: "swing", // Use a generic event or we can rely on "hit" which pushes event anyway
@@ -659,10 +690,10 @@ export class Game {
       // With Z correctly mapped in motion.ts, direction.x is purely lateral intent
       aim =
         this.motion.direction.x * 2.2 + this.playerPos.x * 0.15 + timing * 0.2;
-      
+
       if (this.motion.intentDirection === "left") aim -= 0.6;
       else if (this.motion.intentDirection === "right") aim += 0.6;
-      
+
       aim = clamp(aim, -2.5, 2.5);
 
       if (this.settings.assist === "beginner") {
@@ -720,8 +751,8 @@ export class Game {
       power = clamp(flyMotor.swingPower || 0.55, 0.35, 0.9);
       // Gentle first rallies: reduce power (increases float time) for first few hits if on Casual
       if (this.settings.assist === "beginner" && this.totalHits < 6) {
-         const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
-         power *= handicap;
+        const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
+        power *= handicap;
       }
     } else {
       // Classic AI heuristic aiming
@@ -732,8 +763,8 @@ export class Game {
       );
       power = 0.55;
       if (this.settings.assist === "beginner" && this.totalHits < 6) {
-         const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
-         power *= handicap;
+        const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
+        power *= handicap;
       }
     }
 

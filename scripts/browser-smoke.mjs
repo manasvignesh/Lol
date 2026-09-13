@@ -7,7 +7,7 @@ const browser = await chromium.launch({
   args: [
     "--enable-unsafe-swiftshader",
     "--use-fake-ui-for-media-stream",
-    "--use-fake-device-for-media-stream"
+    "--use-fake-device-for-media-stream",
   ],
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -37,7 +37,7 @@ await page.locator("#settings-done").click();
 if (await page.locator("#pause-screen").isHidden())
   throw new Error("Settings did not return to paused match");
 await page.locator("#back-home").click();
-await page.locator("#synthetic").click();
+await page.locator("#synthetic").dispatchEvent("click");
 await page.waitForFunction(() => window.motionDiagnostics.contacts > 0);
 const synthetic = await page.evaluate(() => window.motionDiagnostics);
 await page.locator("#pause").click();
