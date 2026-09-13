@@ -1,7 +1,7 @@
 import * as T from "three";
 import type { Game } from "./game";
 import { predict } from "./physics";
-import { clamp, type V3 } from "./math";
+import { clamp, len, type V3 } from "./math";
 import { C } from "./config";
 export class CourtRenderer {
   scene = new T.Scene();
@@ -434,8 +434,16 @@ export class CourtRenderer {
         game.racket.y,
         game.racket.z,
       );
-      const rBlade = C.racketBladeRadius[game.settings.assist] || 0.28;
-      this.debugRacketSphere.scale.setScalar(rBlade / 0.28);
+      const incomingSpeed = len(game.shuttle.velocity);
+      const speedAssist = clamp((incomingSpeed - 8) / 12, 0, 1) * 0.10;
+      const baseRadius = C.racketBladeRadius[game.settings.assist] || 0.42;
+      const rBlade = baseRadius + speedAssist;
+      const depthScale = game.settings.assist === "beginner" ? 1.81 : 1.5;
+      this.debugRacketSphere.scale.set(
+        rBlade / 0.28,
+        rBlade / 0.28,
+        (rBlade / depthScale) / 0.28
+      );
     } else {
       this.debugRacketSphere.visible = false;
     }

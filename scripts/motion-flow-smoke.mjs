@@ -79,7 +79,7 @@ try {
   await setPose();
   await page.waitForTimeout(250);
   for (let i = 0; i < 8; i++) {
-    await setPose(0.3 - i * 0.024, 0.62 - i * 0.028);
+    await setPose(0.3 - i * 0.03, 0.62 - i * 0.04);
     await page.waitForTimeout(35);
   }
   await page.waitForFunction(() => window.motionDiagnostics.contacts >= 1);

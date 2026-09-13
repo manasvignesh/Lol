@@ -2,7 +2,7 @@
 
 A scientifically grounded, playable local singles badminton experience: your webcam tracks your upper-body intent from where you stand, while your opponent is driven by computational neural dynamics constrained by a **real Drosophila connectome (Janelia MaleCNS v1.0)**.
 
-The experience features an active **Leaky Integrate-and-Fire (LIF)** network simulation operating over the biological connectome wiring diagram, accompanied by a real-time **Connectome Lab** visualizer and optogenetic intervention suite.
+The experience features an active **Leaky Integrate-and-Fire (LIF)** network simulation operating over a MaleCNS-derived sensorimotor subgraph, wrapped in an engineered badminton embodiment.
 
 No accounts, cloud inference, external API keys, or video uploads. Runs 100% locally in your browser.
 
@@ -10,40 +10,95 @@ No accounts, cloud inference, external API keys, or video uploads. Runs 100% loc
 
 ---
 
-## Key Innovations
+## Executive Summary
 
-### 1. Zero-Scripted Drosophila Opponent
+This project simulates a biological fruit-fly sensorimotor pathway attempting to play a virtual game of badminton against a human player via a webcam.
 
-- **Empirical Connectome Graph**: Uses the official HHMI Janelia MaleCNS v1.0 dataset (`male-cns:v1.0`) containing **2,439 biologically annotated sensorimotor neurons** and **44,781 directional biological edges** (**1,146,043 biological synapses**) with 100% authentic Janelia body IDs.
-- **Leaky Integrate-and-Fire (LIF) Simulation**: Implements continuous biophysical membrane potential dynamics, exponential synaptic conductances, absolute refractory periods, and biological neurotransmitter signs (+1 ACh, -1 GABA/Glu) following Shiu et al. (_Nature_ 2024).
-- **Optical Sensory Transduction**: Transforms 3D shuttle trajectory into spherical retinal coordinates, looming angular expansion rates ($\eta(t)$), and retinotopic visual projection neuron (`LC4`, `LC6`, `LC10a/b`, `LPLC1/2`) inputs.
-- **Descending Motor Decoding**: Decodes asymmetric population rates of descending neurons (`DNa01`/`DNa02` lateral steering, `DNp01` forward thrust, `DNb01`/`GF` strike triggers) directly into continuous flight kinematics ($v_x, v_z$).
-- **Swept Physical Contact & Zero Proximity Shortcuts**: Outgoing shots derive from genuine swept racket contact mechanics and contact point kinematics. The fly can miss if neural steering or stroke timing is misaligned.
-- **Dual Opponent Mode**: Toggle freely between the **Fruit-Fly Connectome** and the baseline **Classic AI**.
-
-### 2. Live Connectome Lab & Optogenetic Interventions
-
-- **Interactive 3-View Neural Visualizer**:
-  - _Circuit Flow View_: Hierarchical signal propagation from Optic Lobe $\rightarrow$ Central Complex $\rightarrow$ Descending Pathways $\rightarrow$ VNC Motor Effectors with live active signal pathway tracing.
-  - _Spatial View_: 3D anatomical layout of the fly brain in authentic Janelia EM voxel coordinates.
-  - _Spike Raster & Oscilloscope_: Real-time spike rasters and population firing rate traces.
-- **Real-Time Interventions**:
-  - _Silence Looming (LC4/LC6/LPLC)_: Optogenetically silences collision detection; test if the fly misses incoming high-speed shots!
-  - _Silence Steering (DNa02)_: Inhibits lateral motor turning pathways.
-  - _Silence Strike Trigger (DNb01/GF)_: Prevents racket swing execution.
-  - _Synaptic Gain & Sensory Drive Sliders_: Dynamically scale network excitability.
-
-### 3. Intent-Based Human Control Model
-
-- **Play from where you stand**: Designed for real physical play in a ~1m × 1m space.
-- **Auto-Footwork & Body Intent**: The virtual player avatar handles court traversal automatically. Subtle torso leans and reach directions bias speed, court positioning, and shot placement.
-- **3-Stage Fast Calibration**: 3–5 second calibration (Center $\rightarrow$ Racket Hand $\rightarrow$ Extended Reach) with no room traversal required.
+The application translates the 3D trajectory of the virtual shuttlecock into spherical retinal visual currents, feeds them through an authentic, topologically correct subset of the Janelia MaleCNS v1.0 connectome graph (2,439 neurons, 44,781 edges, 1,146,043 biological synapses), and decodes the resulting descending motor population rates. These abstract biological signals are then handed off to an engineered **Embodiment Adapter** which bridges the gap between biological intent (locomotion, steering, escape bursts) and physical court mechanics (racket strokes, physical reach, footwork).
 
 ---
 
-## Quick Start (Windows / macOS / Linux)
+## Real vs Engineered Distinctions
 
-Prerequisites: Node.js 22+ and Git. Recommended: Google Chrome or Microsoft Edge with hardware acceleration enabled.
+| Component | Biological (MaleCNS v1.0 Derived) | Engineered (Game Logic / Virtual Avatar) |
+| :--- | :--- | :--- |
+| **Input / Vision** | Senses looming visual patterns via engineered spherical retinal projection | Shuttlecock trajectory prediction, physical court bounds |
+| **Network Architecture** | 2,439 real neurons, 44,781 biological edges, accurate body IDs & cell types | LIF dynamics, constant conductance factors, discrete time steps |
+| **Output / Motor** | DNa01/DNa02 (steering), DNp01/VNC (thrust), MDN (braking), DNb01 (saccade) | Avatar movement (Vx, Vz), procedural 3D racket swing arc |
+| **Gameplay Interactions** | None directly. No concept of a "racket" exists in the connectome graph. | Swept physical racket collision, human ghost-hit prevention, 3D court physics |
+
+### Is it trained?
+**No.** There is no machine learning, no backpropagation, and no genetic algorithms used to adjust synaptic weights for gameplay performance. The graph structure and synaptic weights are derived directly from the empirical Janelia MaleCNS v1.0 dataset. Game balance is achieved entirely through careful tuning of the engineered sensory encoder (input scaling) and embodiment adapter (output physical limits).
+
+---
+
+## Data Sources
+
+The project relies exclusively on the **HHMI Janelia MaleCNS v1.0** dataset for its biological graph data and morphology.
+* **FlyWire** is **not** used in this iteration of the execution runtime.
+* The extracted subgraph contains precisely 2,439 neurons (1,158 visual, 138 central complex, 702 interneurons, 186 descending, 255 VNC motor effectors).
+
+---
+
+## Pipeline Diagram
+
+```mermaid
+flowchart TD
+    subgraph Human Environment
+    W[Webcam] --> P[MediaPipe Pose]
+    P --> |Intent| HI[Human Avatar Adapter]
+    HI --> |Swept Racket Arc| S[Physical Shuttlecock]
+    end
+
+    subgraph Engineered Embodiment
+    S --> |Trajectory & Speed| V[Sensory Encoder]
+    V --> |Optic Flow & Looming| OL(Optic Lobe LC4/LC6)
+    
+    EA[Embodiment Adapter] --> |Procedural 3D Strike Arc| S
+    EA --> |Vz, Vx| FC[Fly Court Position]
+    end
+
+    subgraph MaleCNS Sensorimotor Subgraph
+    OL --> |LIF Spikes| CC(Central Complex)
+    CC --> |LIF Spikes| DN(Descending Neurons)
+    OL --> |LIF Spikes| DN
+    DN --> |Firing Rates| MD[Motor Decoder]
+    end
+
+    MD --> |Thrust, Steering, Arousal| EA
+```
+
+---
+
+## Technical Nuances
+
+### Human Control Model
+The human player uses a webcam. Control is rooted in **physical swept collisions**.
+* **Intent-Based Footwork**: Lean left/right or step forward/back to guide the avatar. The avatar automatically targets the nearest viable intercept point, but your lean acts as an override.
+* **Strict Collision Geometry**: The avatar will **not** auto-hit the shuttle. You must generate a verified swing (e.g., racket velocity over a threshold) whose swept path physically intersects the shuttle's radius. Hand-waving gestures away from the shuttle are strictly ignored.
+
+### Fruit-Fly Control Model
+The biological simulation is bridged by the **Embodiment Adapter**:
+* **Deep Court Retreat**: When a high, deep shot passes over the fly, the biological arousal and braking drives modulate an engineered backward retreat targeting a comfortable descending strike height (1.45m).
+* **Two Modes**: 
+  - `demo-assist` mode widens the fly's physical reach window and speeds up movement to make the game feel like a continuous rally. 
+  - `scientific` mode applies tighter motor constraints and stricter timing windows, drastically lowering the successful return rate but reflecting a more rigid mapping.
+
+---
+
+## In-Silico Interventions & Validation
+
+The application features a real-time **Connectome Lab** visualizer that traces LIF population firing rates. You can trigger live *in-silico interventions* to observe behavioral changes:
+* **Silence Looming (LC4/LC6/LPLC)**: Blocks collision detection. The fly will fail to react to fast incoming shots.
+* **Silence Steering (DNa02)**: Inhibits lateral motor pathways. The fly will struggle with wide cross-court shots.
+
+The biological extraction is verified via an automated test suite (`npm run validate:connectome`) enforcing precise counts for synapses (1,146,043) and edges (44,781).
+
+---
+
+## Quick Start
+
+Prerequisites: Node.js 22+ and Git.
 
 ```powershell
 git clone https://github.com/manasvignesh/Lol.git
@@ -52,74 +107,17 @@ npm ci
 npm run setup
 npm run dev
 ```
-
 Open **http://127.0.0.1:5173**.
 
-For an optimized production build:
-
-```powershell
-npm run build
-npm run preview
-```
-
 ---
 
-## Scientific Documentation
+## Documentation
 
-- [docs/NEUROSCIENCE.md](docs/NEUROSCIENCE.md): Comprehensive biophysical formulation, LIF equations, sensory encoding math, motor decoding, and scientific honesty boundaries.
-- [docs/CONNECTOME_DATA.md](docs/CONNECTOME_DATA.md): Connectome CSR matrix binary format, schema, MaleCNS v1.0 GCS extraction pipeline, and dataset reproduction.
-- [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md): Citations and credit for HHMI Janelia MaleCNS v1.0, FlyWire, and open-source packages.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): System architecture, Web Worker execution pipeline, and state synchronization.
-- [docs/VALIDATION.md](docs/VALIDATION.md): Automated verification suite and acceptance testing record.
-
----
-
-## How to Play
-
-1. Click **Play with Camera** and allow webcam access.
-2. Complete the 3-second calibration:
-   - **Step 1:** Stand centered and relaxed.
-   - **Step 2:** Raise only your racket hand above shoulder level.
-   - **Step 3:** Extend your racket arm comfortably.
-3. **Serve**: Make a deliberate, gentle upward swing.
-4. **Rally**: Swing naturally as the shuttle approaches. Torso leans steer your avatar; forearm trajectory directs shot type (Clear, Drive, Drop, Smash, Lift).
-5. **Connectome Lab**: Click the **🧠 CONNECTOME LAB** button in the header or HUD to open the live neural visualizer and experiment with optogenetic silencing during live rallies!
+* [docs/NEUROSCIENCE.md](docs/NEUROSCIENCE.md): In-depth LIF mathematics and biological demarcations.
+* [docs/CONNECTOME_DATA.md](docs/CONNECTOME_DATA.md): Data extraction details.
+* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Frontend system and state pipeline.
+* [docs/VALIDATION.md](docs/VALIDATION.md): Telemetry and verification processes.
+* [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md): Citations.
 
 ---
-
-## Keyboard Controls (Test Mode)
-
-| Key                   | Action                                     |
-| :-------------------- | :----------------------------------------- |
-| **A / D**             | Steer player avatar left / right           |
-| **W / S**             | Adjust racket reach height                 |
-| **Space**             | Swing racket / Serve                       |
-| **1 / 2 / 3 / 4 / 5** | Clear / Drive / Drop / Smash / Lift intent |
-| **Escape**            | Pause / Resume                             |
-
----
-
-## Verification & Testing
-
-```powershell
-# Run 43 automated unit and integration tests
-npm test
-
-# Verify MaleCNS v1.0 biological graph integrity
-npm run validate:connectome
-
-# Typecheck and build verification
-npm run typecheck
-npm run build
-
-# Format check
-npm run format:check
-```
-
----
-
-## License & Attribution
-
-- Connectome data adapted from HHMI Janelia MaleCNS v1.0 and FlyWire (_Nature_ 2024).
-- MediaPipe Pose Landmarker: Apache-2.0.
-- Three.js: MIT License.
+*Connectome data adapted from HHMI Janelia MaleCNS v1.0. MediaPipe Pose Landmarker: Apache-2.0. Three.js: MIT License.*

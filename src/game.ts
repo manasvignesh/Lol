@@ -262,14 +262,16 @@ export class Game {
           this.motion.swingId !== this.usedSwing;
 
         if (isConfirmedSwing) {
+          const depthScale = this.settings.assist === "beginner" ? 1.81 : 1.5;
+          const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
           const serveContact = sweptDistance(
-            this.previousRacket,
-            this.racket,
-            heldPos,
-            heldPos,
+            scaleP(this.previousRacket),
+            scaleP(this.racket),
+            scaleP(heldPos),
+            scaleP(heldPos),
           );
-          const serveRadius =
-            (C.racketBladeRadius[this.settings.assist] || 0.35) + 0.08;
+          // Serve requires more precision. We don't use the massive 0.66m beginner radius.
+          const serveRadius = 0.45;
 
           if (serveContact.distance < serveRadius) {
             this.usedSwing = this.motion.swingId;
@@ -346,12 +348,22 @@ export class Game {
     }
 
     if (s.lastHit === 1 && s.p.z > 0.1) {
-      const racketRadius = C.racketBladeRadius[this.settings.assist] || 0.28;
+      const baseRadius = C.racketBladeRadius[this.settings.assist] || 0.42;
+      const incomingSpeed = len(s.velocity);
+      const speedAssist = clamp((incomingSpeed - 8) / 12, 0, 1) * 0.10; // max 0.10m assist
+      const racketRadius = baseRadius + speedAssist;
+
+      // Anisotropic scaling: Z (depth) is tighter than X/Y.
+      // E.g., for beginner base radius 0.58, we want depth tolerance ~0.32
+      // Scale Z differences up by 1.8 so a 0.32 Z-distance is treated as 0.58.
+      const depthScale = this.settings.assist === "beginner" ? 1.81 : 1.5;
+      const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
+
       const contact = sweptDistance(
-        this.previousRacket,
-        this.racket,
-        s.prev,
-        s.p,
+        scaleP(this.previousRacket),
+        scaleP(this.racket),
+        scaleP(s.prev),
+        scaleP(s.p),
       );
 
       let hitAccepted = false;

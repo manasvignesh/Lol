@@ -692,5 +692,55 @@ describe("match and connected rallies", () => {
       expect(g.state).toBe("rally");
       expect(g.totalHits).toBe(1);
     });
+
+    it("accepts borderline swings in Beginner but rejects in Normal", () => {
+      // Helper to map absolute world XYZ target to motion input
+      const placeRacket = (tgtX: number, tgtY: number, tgtZ: number) => {
+        // target.x = playerPos.x + motion.racket.x - motion.playerX -> motion.x = tgt.x + 0.5 (since playerPos.x=0)
+        // target.y = motion.racket.y -> motion.y = tgt.y
+        // target.z = playerPos.z - 0.4 + motion.racket.z - 3.45 -> motion.z = tgt.z - 3.6 + 3.45 = tgt.z - 0.15 (since playerPos.z=4.0)
+        return v(tgtX + 0.5, tgtY, tgtZ - 0.15);
+      };
+
+      const runBorderline = (assist: "beginner" | "normal") => {
+        const g = new Game({ ...defaults, assist });
+        g.state = "rally";
+        g.shuttle = { p: v(0, 1.4, 3.4), prev: v(0, 1.4, 3.4), velocity: v(0, 0, 8), lastHit: 1 };
+        g.racket = v(0.48, 1.4, 3.4); 
+        g.previousRacket = v(0.48, 1.4, 3.4);
+        g.setMotion({ ...neutralMotion(), racket: placeRacket(0.48, 1.4, 3.4), confidence: 1, swing: true, swingId: 200, power: 0.8 });
+        for (let i = 0; i < 10; i++) g.step(1 / 120);
+        return g.totalHits;
+      };
+      expect(runBorderline("beginner")).toBe(1);
+      expect(runBorderline("normal")).toBe(0);
+    });
+
+    it("rejects swing if far away in Z (anisotropic depth scaling)", () => {
+      const g = new Game({ ...defaults, assist: "beginner" });
+      g.state = "rally";
+      g.shuttle = { p: v(0, 1.4, 3.4), prev: v(0, 1.4, 3.4), velocity: v(0, 0, 8), lastHit: 1 };
+      
+      const placeRacket = (tgtX: number, tgtY: number, tgtZ: number) => v(tgtX + 0.5, tgtY, tgtZ - 0.15);
+      // Racket is at Z=2.95 (0.45m behind the shuttle). Shuttle moves to +Z, so it moves away.
+      g.racket = v(0, 1.4, 2.95); 
+      g.previousRacket = v(0, 1.4, 2.95);
+      g.setMotion({ ...neutralMotion(), racket: placeRacket(0, 1.4, 2.95), confidence: 1, swing: true, swingId: 201, power: 0.8 });
+      for (let i = 0; i < 10; i++) g.step(1 / 120);
+      expect(g.totalHits).toBe(0);
+    });
+
+    it("adds speed assist for fast shuttles (20 m/s)", () => {
+      const g = new Game({ ...defaults, assist: "normal" }); 
+      g.state = "rally";
+      g.shuttle = { p: v(0, 1.4, 3.4), prev: v(0, 1.4, 3.4), velocity: v(0, 0, 20), lastHit: 1 };
+      
+      const placeRacket = (tgtX: number, tgtY: number, tgtZ: number) => v(tgtX + 0.5, tgtY, tgtZ - 0.15);
+      g.racket = v(0.48, 1.4, 3.4); 
+      g.previousRacket = v(0.48, 1.4, 3.4);
+      g.setMotion({ ...neutralMotion(), racket: placeRacket(0.48, 1.4, 3.4), confidence: 1, swing: true, swingId: 202, power: 0.8 });
+      for (let i = 0; i < 10; i++) g.step(1 / 120);
+      expect(g.totalHits).toBe(1);
+    });
   });
 });
