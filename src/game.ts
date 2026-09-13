@@ -56,7 +56,11 @@ export class OpponentAI {
     if (this.state === "WAIT" && this.timer <= 0) this.state = "MOVE";
     if (this.state === "MOVE" || this.state === "RECOVER") {
       const target = this.state === "RECOVER" ? v(0, 0, -3.9) : this.target;
-      const speed = C.ai[settings.difficulty].speed * dt;
+      let speedMult = 1.0;
+      if (this.state === "RECOVER") {
+        speedMult = settings.difficulty === "easy" ? 0.35 : 0.75;
+      }
+      const speed = C.ai[settings.difficulty].speed * speedMult * dt;
       this.x += clamp(target.x - this.x, -speed, speed);
       this.z += clamp(target.z - this.z, -speed, speed);
       this.x = clamp(this.x, -2.4, 2.4);
@@ -612,6 +616,38 @@ export class Game {
         if (isSwinging && racketContact.distance < racketBladeRadius) {
           this.fly.swingAttempted = true;
 
+          // Fly contact quality
+          let quality = 1.0;
+          
+          // Penalty for off-center contact
+          if (racketContact.distance > 0.2) {
+              quality -= ((racketContact.distance - 0.2) / racketBladeRadius) * 0.4;
+          }
+          
+          // Penalty for low neural arousal (not ready)
+          if (flyMotor && flyMotor.arousal < 0.5) {
+              quality -= (0.5 - flyMotor.arousal) * 0.5;
+          }
+          
+          // Penalty for late/early strike
+          if (this.currentShotDiagnostic && this.currentShotDiagnostic.closestTime > 0) {
+              const timingError = Math.abs(this.time - this.currentShotDiagnostic.closestTime);
+              if (timingError > 0.1) {
+                  quality -= (timingError - 0.1) * 2.0; // Rapidly drops off if highly mistimed
+              }
+          }
+          
+          quality = clamp(quality, 0.1, 1);
+
+          // Natural Physical Misses on Casual
+          if (this.settings.flyEmbodimentMode !== "scientific") {
+              const missChance = (1 - quality) * 0.45;
+              if (this.random() < missChance) {
+                  // Let the shuttle pass; physical miss
+                  return;
+              }
+          }
+
           if (this.currentShotDiagnostic) {
             this.currentShotDiagnostic.result = "HIT";
             this.currentShotDiagnostic.closestDistance = Math.min(
@@ -650,7 +686,7 @@ export class Game {
                 : flyMotor?.swingType === "backhand"
                   ? "drive"
                   : "clear";
-          this.hit(1, hitIntent);
+          this.hit(1, hitIntent, quality);
         }
       }
     } else {
@@ -658,24 +694,56 @@ export class Game {
         s.lastHit === 0 &&
         s.p.z < -0.6 &&
         s.velocity.y < 0 &&
-        s.p.y < 2.1 &&
-        s.p.y > 0.3 &&
+        s.p.y < 2.2 &&
+        s.p.y > 0.2 &&
         this.ai.state === "MOVE" &&
-        !this.ai.attempted &&
-        Math.hypot(s.p.x - this.ai.x, s.p.z - this.ai.z) < 1.1
+        !this.ai.attempted
       ) {
-        this.ai.attempted = true;
-        this.ai.state = "SWING";
-        if (this.random() > C.ai[this.settings.difficulty].miss) {
-          const intents: Intent[] = ["clear", "drive", "drop", "lift"];
-          this.hit(1, intents[Math.floor(this.random() * intents.length)]);
+        // Physical geometry of the contact
+        const latDist = Math.abs(s.p.x - this.ai.x);
+        const depthDist = Math.abs(s.p.z - this.ai.z);
+        const reachDist = Math.hypot(latDist, depthDist);
+        
+        if (reachDist < 1.8) {
+          this.ai.attempted = true;
+          this.ai.state = "SWING";
+          
+          // Compute contact quality (0 to 1)
+          let quality = 1.0;
+          
+          // Penalty for reaching far (beyond 0.6m)
+          if (reachDist > 0.6) quality -= ((reachDist - 0.6) / 1.2) * 0.4;
+          
+          // Penalty for very low contact
+          if (s.p.y < 0.8) quality -= (0.8 - s.p.y) * 0.5;
+          
+          // Penalty for fast incoming shot
+          const incomingSpeed = len(s.velocity);
+          if (incomingSpeed > 10) quality -= (incomingSpeed - 10) * 0.03;
+          
+          quality = clamp(quality, 0.1, 1);
+          
+          // Return probability based on difficulty and quality
+          let missChance = C.ai[this.settings.difficulty].miss;
+          if (this.settings.difficulty === "easy") {
+              missChance += (1 - quality) * 0.55;
+          } else {
+              missChance += (1 - quality) * 0.3;
+          }
+
+          if (this.random() > missChance) {
+            const intents: Intent[] = ["clear", "drive", "drop", "lift"];
+            this.hit(1, intents[Math.floor(this.random() * intents.length)], quality);
+          } else {
+            // Register a visual miss for diagnostics if needed, or simply let it fall
+          }
+          this.ai.state = "RECOVER";
         }
-        this.ai.state = "RECOVER";
       }
     }
   }
 
-  hit(side: 0 | 1, intent: Intent | "serve") {
+  hit(side: 0 | 1, intent: Intent | "serve", quality: number = 1.0) {
     const s = this.shuttle;
     const incomingSpeed = len(s.velocity);
     const timing = side === 0 ? clamp((this.racket.z - s.p.z) / 1.1, -1, 1) : 0;
@@ -768,34 +836,41 @@ export class Game {
       }
     }
 
+    if (side === 1) {
+        power *= (0.65 + 0.35 * quality); // Weaker return on poor contact
+    }
+
     const error =
       side === 0
         ? 0
         : this.settings.opponentType === "fruitfly"
-          ? 0
-          : C.ai[this.settings.difficulty].error * (this.random() - 0.5);
+          ? (1 - quality) * (this.random() - 0.5) * 1.5 // Fly gets some error on bad hits
+          : C.ai[this.settings.difficulty].error * (this.random() - 0.5) * (1 + (1 - quality) * 3);
+          
     const target = v(aim + error, 0.03, sign * depth);
 
     if (intent === "smash" && s.p.y < 2.3) intent = "drive";
     let velocity = shotVelocity(s.p, target, intent, power);
 
     // Assisted net clearance
-    const trial: Shuttle = {
-      p: { ...s.p },
-      prev: { ...s.p },
-      velocity: { ...velocity },
-      lastHit: side,
-    };
-    for (let i = 0; i < 300; i++) {
-      integrate(trial, C.dt);
-      if (trial.prev.z * trial.p.z <= 0) {
-        if (trial.p.y < C.netHeight + 0.15) {
-          intent = "clear";
-          velocity = shotVelocity(s.p, target, intent, power);
+    if (side === 0 || (side === 1 && quality > 0.75 && this.settings.difficulty === "normal")) {
+        const trial: Shuttle = {
+          p: { ...s.p },
+          prev: { ...s.p },
+          velocity: { ...velocity },
+          lastHit: side,
+        };
+        for (let i = 0; i < 300; i++) {
+          integrate(trial, C.dt);
+          if (trial.prev.z * trial.p.z <= 0) {
+            if (trial.p.y < C.netHeight + 0.15) {
+              intent = "clear";
+              velocity = shotVelocity(s.p, target, intent, power);
+            }
+            break;
+          }
+          if (trial.p.y < 0) break;
         }
-        break;
-      }
-      if (trial.p.y < 0) break;
     }
 
     s.velocity = velocity;
@@ -929,6 +1004,10 @@ export class Game {
     },
   ) {
     this.ready();
+    this.ai.x = 0;
+    this.ai.z = -3.9;
+    this.ai.state = "WAIT";
+    this.ai.attempted = false;
     const startPos = scenario === "fast" ? v(0, 2.4, 3.8) : v(0, 1.2, 3.8);
     if (params?.originOffset) {
       startPos.x += params.originOffset.x ?? 0;
