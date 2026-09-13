@@ -383,8 +383,17 @@ export class EmbodimentAdapter {
             2.0 * u * (this.strokeP2[2] - this.strokeP1[2])) *
           derivFactor;
 
+        const velMag = Math.sqrt(dvX * dvX + dvY * dvY + dvZ * dvZ);
+        const maxRacketSpeed = 12.5; // Cap animation derivative to realistic physical racket speed (m/s)
+        const velScale =
+          velMag > maxRacketSpeed ? maxRacketSpeed / velMag : 1.0;
+
         this.currentRacketPos = [nextX, nextY, nextZ];
-        this.currentRacketVel = [dvX, dvY, dvZ];
+        this.currentRacketVel = [
+          dvX * velScale,
+          dvY * velScale,
+          dvZ * velScale,
+        ];
 
         // Dynamic rotation through stroke
         if (this.currentSwingType === "backhand") {

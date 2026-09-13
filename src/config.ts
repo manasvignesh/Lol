@@ -17,20 +17,36 @@ export const C = {
   swingHistoryMs: 200,
   predictionLookahead: 0.05,
   playerBase: { x: 0, z: 4.0 },
-  playerSpeed: { beginner: 5.8, normal: 5.2 },
-  recoverySpeed: { beginner: 4.0, normal: 3.4 },
+  human: {
+    playerSpeed: 5.8,
+    recoverySpeed: 4.0,
+    intentPenalty: 0.9,
+    timingWindow: 0.52,
+    contactEnvelope: 0.58,
+    racketBladeRadius: 0.42,
+    reachMultiplier: 2.0,
+    depthScale: 1.81,
+    aimClamp: 2.5,
+    aimSoftEdge: 1.5,
+    aimSoftCompression: 0.3,
+    introRallyDampingHits: 6,
+    assist: 1.05,
+    shotCorrection: 1.0,
+  },
+  playerSpeed: { beginner: 5.8, normal: 5.8 },
+  recoverySpeed: { beginner: 4.0, normal: 4.0 },
   intentLeanThreshold: 0.08,
   intentReachThreshold: 0.45,
   intentBoost: 1.35,
-  intentPenalty: { beginner: 0.9, normal: 0.68 },
-  timingWindow: { beginner: 0.52, normal: 0.32 },
-  contactEnvelope: { beginner: 0.58, normal: 0.42 },
-  racketBladeRadius: { beginner: 0.58, normal: 0.42 },
-  assist: { beginner: 1.05, normal: 0.58 },
-  shotCorrection: { beginner: 1.0, normal: 0.4 },
+  intentPenalty: { beginner: 0.9, normal: 0.9 },
+  timingWindow: { beginner: 0.52, normal: 0.52 },
+  contactEnvelope: { beginner: 0.58, normal: 0.58 },
+  racketBladeRadius: { beginner: 0.58, normal: 0.58 },
+  assist: { beginner: 1.05, normal: 1.05 },
+  shotCorrection: { beginner: 1.0, normal: 1.0 },
   ai: {
-    easy: { speed: 2.9, reaction: 0.38, error: 0.5, miss: 0.1 },
-    normal: { speed: 4.6, reaction: 0.21, error: 0.24, miss: 0.04 },
+    easy: { speed: 3.6, reaction: 0.28, error: 0.35, miss: 0.05 },
+    normal: { speed: 5.2, reaction: 0.16, error: 0.18, miss: 0.02 },
   },
 } as const;
 export type Settings = {
@@ -59,9 +75,11 @@ export const defaults: Settings = {
 };
 export function readSettings(): Settings {
   try {
+    const parsed = JSON.parse(localStorage.getItem("motion-settings") || "{}");
     return {
       ...defaults,
-      ...JSON.parse(localStorage.getItem("motion-settings") || "{}"),
+      ...parsed,
+      assist: "beginner", // Human control profile is fixed
     };
   } catch {
     return { ...defaults };

@@ -389,7 +389,6 @@ $("#app").innerHTML = `
   <div class="setting-grid">
     <label>Camera<select id="camera-select"><option value="">Default camera</option></select></label>
     <label>Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal">Normal</option></select></label>
-    <label>Motion assistance<select id="assist"><option value="beginner">Casual (Beginner)</option><option value="normal">Precision (Normal)</option></select></label>
     <label>Audio volume<input id="volume" type="range" min="0" max="1" step="0.05"></label>
   </div>
   <div class="settings-advanced hidden" id="settings-advanced">
@@ -1175,7 +1174,6 @@ function openSettings() {
   screenBeforeSettings = screen;
   $<HTMLSelectElement>("#opponent-type").value = settings.opponentType;
   $<HTMLSelectElement>("#difficulty").value = settings.difficulty;
-  $<HTMLSelectElement>("#assist").value = settings.assist;
   $<HTMLInputElement>("#sensitivity").value = String(settings.sensitivity);
   $<HTMLInputElement>("#movement").value = String(settings.movement);
   $<HTMLInputElement>("#volume").value = String(settings.volume);
@@ -1201,7 +1199,6 @@ async function populateCameras() {
 $("#settings-done").addEventListener("click", () => {
   settings.opponentType = $<HTMLSelectElement>("#opponent-type").value as any;
   settings.difficulty = $<HTMLSelectElement>("#difficulty").value as any;
-  settings.assist = $<HTMLSelectElement>("#assist").value as any;
   settings.sensitivity = Number($<HTMLInputElement>("#sensitivity").value);
   settings.movement = Number($<HTMLInputElement>("#movement").value);
   settings.volume = Number($<HTMLInputElement>("#volume").value);

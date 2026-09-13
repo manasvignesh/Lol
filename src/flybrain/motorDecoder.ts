@@ -68,17 +68,17 @@ export class MotorDecoder {
     const maxDNb01 = Math.max(rateDNb01_L, rateDNb01_R);
     const turnImpulse = Math.min(1.0, Math.max(0.0, maxDNb01 * 0.03));
 
-    // 5. High-Threshold Escape / Takeoff Activation (Real Giant Fiber & DNp01)
+    // 5. High-Threshold Escape / Takeoff Activation (Real DNp01 & DNb01 descending populations)
     const escapeActivation = Math.min(
       1.0,
       Math.max(0.0, rateDNp01 * 0.018 + maxDNb01 * 0.015),
     );
 
-    // 6. Overall Locomotor Vigor & Arousal
+    // 6. Overall Locomotor Vigor & Arousal (Strictly zero when all neural inputs are zero)
     const locomotorDrive = Math.min(
       1.0,
       Math.max(
-        0.1,
+        0.0,
         (forwardThrust +
           Math.abs(steeringTorque) +
           turnImpulse +

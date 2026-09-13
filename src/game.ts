@@ -18,6 +18,7 @@ import {
   shotVelocity,
   MatchManager,
   type Shuttle,
+  applyFlyRacketContact,
 } from "./physics";
 import { neutralMotion, type Motion, type Intent } from "./motion";
 import { FlyOpponent } from "./flybrain/flyOpponent";
@@ -120,10 +121,12 @@ export class Game {
     shuttlePrev: V3;
   }[] = [];
 
-  constructor(
-    public settings: Settings,
-    public random = Math.random,
-  ) {
+  settings: Settings;
+  random: () => number;
+
+  constructor(settings: Settings, random = Math.random) {
+    this.settings = settings;
+    this.random = random;
     if (this.settings.flyEmbodimentMode) {
       this.fly.setEmbodimentMode(this.settings.flyEmbodimentMode);
     }
@@ -209,8 +212,8 @@ export class Game {
     // Determine movement speed according to state and intent
     let moveSpeed =
       this.footworkState === "INTERCEPTING"
-        ? C.playerSpeed[this.settings.assist] * this.settings.movement
-        : C.recoverySpeed[this.settings.assist] * this.settings.movement;
+        ? C.human.playerSpeed * this.settings.movement
+        : C.human.recoverySpeed * this.settings.movement;
 
     if (this.footworkState === "INTERCEPTING") {
       const dx = this.targetPos.x - this.playerPos.x;
@@ -228,7 +231,7 @@ export class Game {
         (intentDir === "right" && dx < -0.3) ||
         (intentDir === "left" && dx > 0.3)
       ) {
-        moveSpeed *= C.intentPenalty[this.settings.assist];
+        moveSpeed *= C.human.intentPenalty;
       }
     }
 
@@ -298,13 +301,9 @@ export class Game {
           this.motion.swingId !== this.usedSwing;
 
         if (isConfirmedSwing) {
-          const visualRadius =
-            C.racketBladeRadius[this.settings.assist] || 0.42;
-          const gameplayRadiusMult =
-            this.settings.assist === "beginner" ? 2.0 : 1.2;
-          const racketRadius = visualRadius * gameplayRadiusMult;
-
-          const depthScale = this.settings.assist === "beginner" ? 2.0 : 1.4;
+          const visualRadius = C.human.racketBladeRadius;
+          const racketRadius = visualRadius * C.human.reachMultiplier;
+          const depthScale = C.human.depthScale;
           const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
 
           let closestDistance = Infinity;
@@ -401,7 +400,7 @@ export class Game {
     // Check if primed swing is still valid inside timing window
     if (
       this.primedSwing &&
-      this.time - this.primedSwing.time > C.timingWindow[this.settings.assist]
+      this.time - this.primedSwing.time > C.human.timingWindow
     ) {
       this.primedSwing = null;
     }
@@ -419,12 +418,9 @@ export class Game {
 
     if (s.lastHit === 1 && s.p.z > -0.5) {
       // 1. EXPAND EFFECTIVE HIT ZONE
-      const visualRadius = C.racketBladeRadius[this.settings.assist] || 0.42;
-      const gameplayRadiusMult =
-        this.settings.assist === "beginner" ? 2.0 : 1.2;
-      const racketRadius = visualRadius * gameplayRadiusMult;
-
-      const depthScale = this.settings.assist === "beginner" ? 2.0 : 1.4;
+      const visualRadius = C.human.racketBladeRadius;
+      const racketRadius = visualRadius * C.human.reachMultiplier;
+      const depthScale = C.human.depthScale;
       const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
 
       // 2. SHORT BUFFER LATENCY TOLERANCE
@@ -679,32 +675,20 @@ export class Game {
             }
           }
 
-          // Calculate explicit physical outgoing velocity from racket state
-          const isScientific = this.settings.flyEmbodimentMode === "scientific";
+          // Calculate explicit physical outgoing velocity from racket impact physics
           const racketVel = flyMotor.targetRacketVel || [0, 0, 0];
           const powerLevel = flyMotor.swingPower || 0.5;
-          const baseVz = 10 + powerLevel * 14;
 
-          const contactOffset = (s.p.x - rPos.x) * 3.5;
-          let vx =
-            racketVel[0] * 0.45 +
-            this.fly.x * -1.2 +
-            contactOffset * (1 - quality);
-          let vy = 3.8 + racketVel[1] * 0.4 + powerLevel * 5.5;
-          let vz = Math.max(8, baseVz * quality + racketVel[2] * 0.3);
+          const outVelocity = applyFlyRacketContact(
+            s.velocity,
+            racketVel,
+            s.p,
+            rPos,
+            powerLevel,
+            quality,
+            this.settings.flyEmbodimentMode,
+          );
 
-          if (!isScientific) {
-            // Slight organic variation in demo-assist if off-center contact
-            vx += (this.random() - 0.5) * (1 - quality) * 1.5;
-            vz += (this.random() - 0.5) * (1 - quality) * 1.5;
-          }
-
-          if (this.settings.assist === "beginner" && this.totalHits < 6) {
-            vz *= 0.8;
-            vy += 2.0;
-          }
-
-          const outVelocity = v(vx, vy, vz);
           this.hit(1, outVelocity, quality);
         }
       }
@@ -800,11 +784,16 @@ export class Game {
         if (this.motion.intentDirection === "left") aim -= 0.6;
         else if (this.motion.intentDirection === "right") aim += 0.6;
 
-        aim = clamp(aim, -2.5, 2.5);
+        aim = clamp(aim, -C.human.aimClamp, C.human.aimClamp);
 
-        if (this.settings.assist === "beginner") {
-          if (aim > 1.5) aim = 1.5 + (aim - 1.5) * 0.3;
-          if (aim < -1.5) aim = -1.5 + (aim + 1.5) * 0.3;
+        if (aim > C.human.aimSoftEdge) {
+          aim =
+            C.human.aimSoftEdge +
+            (aim - C.human.aimSoftEdge) * C.human.aimSoftCompression;
+        } else if (aim < -C.human.aimSoftEdge) {
+          aim =
+            -C.human.aimSoftEdge +
+            (aim + C.human.aimSoftEdge) * C.human.aimSoftCompression;
         }
 
         power = clamp(
@@ -847,8 +836,10 @@ export class Game {
           1.8,
         );
         power = 0.55;
-        if (this.settings.assist === "beginner" && this.totalHits < 6) {
-          const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
+        if (this.totalHits < C.human.introRallyDampingHits) {
+          const handicap =
+            0.75 +
+            (1.0 - 0.75) * (this.totalHits / C.human.introRallyDampingHits);
           power *= handicap;
         }
       }

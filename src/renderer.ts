@@ -436,9 +436,9 @@ export class CourtRenderer {
       );
       const incomingSpeed = len(game.shuttle.velocity);
       const speedAssist = clamp((incomingSpeed - 8) / 12, 0, 1) * 0.1;
-      const baseRadius = C.racketBladeRadius[game.settings.assist] || 0.42;
+      const baseRadius = C.human.racketBladeRadius;
       const rBlade = baseRadius + speedAssist;
-      const depthScale = game.settings.assist === "beginner" ? 1.81 : 1.5;
+      const depthScale = C.human.depthScale;
       this.debugRacketSphere.scale.set(
         rBlade / 0.28,
         rBlade / 0.28,
@@ -552,8 +552,7 @@ export class CourtRenderer {
       const end = pts[pts.length - 1];
       if (end) this.landing.position.set(end.x, 0.075, end.z);
     }
-    this.landing.visible =
-      game.state === "rally" && game.settings.assist === "beginner";
+    this.landing.visible = game.state === "rally";
     this.flashLife = Math.max(0, this.flashLife - dt);
     this.flash.scale.setScalar(1 + (0.22 - this.flashLife) * 7);
     this.flash.quaternion.copy(this.camera.quaternion);

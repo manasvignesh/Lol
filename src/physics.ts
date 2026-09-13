@@ -147,3 +147,50 @@ export class MatchManager {
     if ((a >= 21 && a - b >= 2) || a >= 30) this.winner = side;
   }
 }
+
+export function applyFlyRacketContact(
+  incomingShuttleVel: V3,
+  racketVel: [number, number, number],
+  racketContactPos: V3,
+  racketCenterPos: V3,
+  swingPower: number,
+  quality: number,
+  mode: "demo-assist" | "scientific",
+): V3 {
+  const offsetX = clamp(
+    (racketContactPos.x - racketCenterPos.x) / 0.35,
+    -1.0,
+    1.0,
+  );
+  const offsetY = clamp(
+    (racketContactPos.y - racketCenterPos.y) / 0.35,
+    -1.0,
+    1.0,
+  );
+
+  const restitution = 0.16 + quality * 0.12;
+  const forwardImpulse = (7.2 + swingPower * 5.8) * (0.65 + quality * 0.35);
+  const rawVz =
+    Math.abs(incomingShuttleVel.z) * restitution +
+    forwardImpulse +
+    racketVel[2] * 0.22;
+
+  const lateralDeflection = offsetX * 2.8 * (1.1 - quality * 0.5);
+  const rawVx = racketVel[0] * 0.32 + lateralDeflection;
+
+  const verticalLift =
+    (2.6 + swingPower * 2.4) * (0.7 + quality * 0.3) +
+    racketVel[1] * 0.22 -
+    offsetY * 1.2;
+  const rawVy = Math.max(1.0, verticalLift);
+
+  const maxVz = mode === "demo-assist" ? 14.5 : 15.5;
+  const maxVx = 4.5;
+  const maxVy = 7.0;
+
+  const outVx = clamp(rawVx, -maxVx, maxVx);
+  const outVy = clamp(rawVy, 1.0, maxVy);
+  const outVz = clamp(rawVz, 3.5, maxVz);
+
+  return v(outVx, outVy, outVz);
+}

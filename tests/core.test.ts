@@ -359,12 +359,11 @@ describe("auto-footwork, contact envelope & timing windows", () => {
     expect(g.totalHits).toBe(1);
   });
 
-  it("Beginner assistance is more forgiving than Normal in contact envelope and timing", () => {
-    expect(C.contactEnvelope.beginner).toBeGreaterThan(
-      C.contactEnvelope.normal,
-    );
-    expect(C.timingWindow.beginner).toBeGreaterThan(C.timingWindow.normal);
-    expect(C.playerSpeed.beginner).toBeGreaterThanOrEqual(C.playerSpeed.normal);
+  it("Human assistance has generous unified forgiving parameters across all modes", () => {
+    expect(C.human.timingWindow).toBeGreaterThanOrEqual(0.45);
+    expect(C.human.reachMultiplier).toBeGreaterThanOrEqual(1.5);
+    expect(C.human.playerSpeed).toBeGreaterThanOrEqual(4.5);
+    expect(C.human.racketBladeRadius).toBeGreaterThan(0.4);
   });
 });
 
@@ -734,9 +733,9 @@ describe("match and connected rallies", () => {
       expect(g.totalHits).toBe(1);
     });
 
-    it("accepts borderline swings in Beginner but rejects in Normal", () => {
-      const runBorderline = (assist: "beginner" | "normal") => {
-        const g = new Game({ ...defaults, assist });
+    it("human contact profile is identical regardless of difficulty setting", () => {
+      const runBorderline = (difficulty: "easy" | "normal") => {
+        const g = new Game({ ...defaults, difficulty });
         g.state = "rally";
         g.shuttle = {
           p: v(0, 1.4, 2.0),
@@ -744,11 +743,11 @@ describe("match and connected rallies", () => {
           velocity: v(0, -1, 4),
           lastHit: 1,
         };
-        // Set racket right around the distance cutoff
-        g.racket = v(0.7, 1.4, 2.0);
+        // Set racket within physical reach
+        g.racket = v(0.5, 1.4, 2.0);
         g.setMotion({
           ...neutralMotion(),
-          racket: v(0.7, 1.4, 2.0),
+          racket: v(0.5, 1.4, 2.0),
           confidence: 1,
           swing: true,
           swingId: 2,
@@ -756,8 +755,8 @@ describe("match and connected rallies", () => {
         for (let i = 0; i < 10; i++) g.step(1 / 120);
         return g.totalHits;
       };
-      expect(runBorderline("beginner")).toBe(1);
-      expect(runBorderline("normal")).toBe(0);
+      expect(runBorderline("easy")).toBe(1);
+      expect(runBorderline("normal")).toBe(1);
     });
 
     it("rejects swing if far away in Z (anisotropic depth scaling)", () => {
