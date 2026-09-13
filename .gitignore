@@ -4,6 +4,7 @@ dist/
 data/raw/
 data/cache/
 data/downloads/
+data/morphology/raw/
 *.feather
 *.parquet
 public/wasm/

@@ -383,16 +383,22 @@ export class Game {
             this.currentShotDiagnostic.prepareTime === 0
           ) {
             this.currentShotDiagnostic.prepareTime = this.time;
+            if (
+              flyMotor?.timeToContact !== undefined &&
+              flyMotor.timeToContact > 0 &&
+              flyMotor.timeToContact < 4.0
+            ) {
+              const predTime = this.time + flyMotor.timeToContact;
+              this.currentShotDiagnostic.predictedContactTime = predTime;
+              this.currentShotDiagnostic.predictedContactTimeAtPrepare =
+                predTime;
+            }
           }
           if (
             (flyMotor?.racketState === "STRIKE" || flyMotor?.swingTriggered) &&
             this.currentShotDiagnostic.strikeTime === 0
           ) {
             this.currentShotDiagnostic.strikeTime = this.time;
-          }
-          if (flyMotor?.timeToContact) {
-            this.currentShotDiagnostic.predictedContactTime =
-              this.time + flyMotor.timeToContact;
           }
         }
       }
@@ -427,6 +433,24 @@ export class Game {
               this.currentShotDiagnostic.closestDistance,
               racketContact.distance,
             );
+            if (
+              this.currentShotDiagnostic.strikeTime > 0 &&
+              this.currentShotDiagnostic.closestTime > 0
+            ) {
+              this.currentShotDiagnostic.actualStrikeTimingError = Math.abs(
+                this.currentShotDiagnostic.strikeTime -
+                  this.currentShotDiagnostic.closestTime,
+              );
+            }
+            if (
+              this.currentShotDiagnostic.predictedContactTimeAtPrepare &&
+              this.currentShotDiagnostic.closestTime > 0
+            ) {
+              this.currentShotDiagnostic.predictionErrorAtPrepare = Math.abs(
+                this.currentShotDiagnostic.predictedContactTimeAtPrepare -
+                  this.currentShotDiagnostic.closestTime,
+              );
+            }
             this.diagnosticHistory.push({ ...this.currentShotDiagnostic });
             if (this.diagnosticHistory.length > 50) {
               this.diagnosticHistory.shift();
@@ -785,6 +809,24 @@ export class Game {
         this.currentShotDiagnostic.result = "MISS";
         this.currentShotDiagnostic.missReason = this
           .lastMissReason as FlyMissReason;
+        if (
+          this.currentShotDiagnostic.strikeTime > 0 &&
+          this.currentShotDiagnostic.closestTime > 0
+        ) {
+          this.currentShotDiagnostic.actualStrikeTimingError = Math.abs(
+            this.currentShotDiagnostic.strikeTime -
+              this.currentShotDiagnostic.closestTime,
+          );
+        }
+        if (
+          this.currentShotDiagnostic.predictedContactTimeAtPrepare &&
+          this.currentShotDiagnostic.closestTime > 0
+        ) {
+          this.currentShotDiagnostic.predictionErrorAtPrepare = Math.abs(
+            this.currentShotDiagnostic.predictedContactTimeAtPrepare -
+              this.currentShotDiagnostic.closestTime,
+          );
+        }
         this.diagnosticHistory.push({ ...this.currentShotDiagnostic });
         if (this.diagnosticHistory.length > 50) {
           this.diagnosticHistory.shift();

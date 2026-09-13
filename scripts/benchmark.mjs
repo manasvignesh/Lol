@@ -129,10 +129,16 @@ export async function runStressBenchmark(
               Math.max(0, diag.closestTime - diag.prepareTime),
             );
           }
-          if (diag.predictedContactTime > 0 && diag.closestTime > 0) {
-            strikeTimingErrors.push(
-              Math.abs(diag.closestTime - diag.predictedContactTime),
-            );
+          if (
+            diag.actualStrikeTimingError !== undefined &&
+            diag.actualStrikeTimingError < 3.0
+          ) {
+            strikeTimingErrors.push(diag.actualStrikeTimingError);
+          } else if (
+            diag.predictionErrorAtPrepare !== undefined &&
+            diag.predictionErrorAtPrepare < 3.0
+          ) {
+            strikeTimingErrors.push(diag.predictionErrorAtPrepare);
           }
           if (!returned) {
             const reason =

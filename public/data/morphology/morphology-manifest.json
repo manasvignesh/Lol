@@ -1,0 +1,54 @@
+{
+  "dataset": "malecns:v1.0",
+  "datasetName": "MaleCNS",
+  "datasetVersion": "v1.0",
+  "provenance": "official-janelia-neuprint-swc",
+  "neuronCount": 2439,
+  "morphologyNeurons": 2439,
+  "missingMorphologyCount": 0,
+  "totalRawNodes": 9388981,
+  "totalSegments": 975600,
+  "rawVoxelSizeNm": [
+    8,
+    8,
+    8
+  ],
+  "coordinateUnits": "male_cns_8nm_voxels",
+  "transform": {
+    "center": [
+      48224,
+      39136,
+      72800
+    ],
+    "scaleFactor": 0.000019440124416796266,
+    "scaleBar100umUnits": 0.243,
+    "boundsMin": [
+      8000,
+      6336,
+      11072
+    ],
+    "boundsMax": [
+      88448,
+      71936,
+      134528
+    ]
+  },
+  "files": {
+    "segmentPositions.bin": {
+      "sha256": "d1d496423b3a5dbc3f24bffd4621d3b75410b8f54adb3066b7b5bba28fdbd668",
+      "byteLength": 23414400
+    },
+    "segmentBodyIds.bin": {
+      "sha256": "604a9117ad1307c93d91cd459c1b865fcb56fc7dcc2b5738fac5db96337d466b",
+      "byteLength": 1951200
+    },
+    "neuronOffsets.bin": {
+      "sha256": "657512675fba7b385153e2e272e7199bd02127e2c511f58e7087c24593cbaa38",
+      "byteLength": 9760
+    },
+    "morphologyMeta.json": {
+      "sha256": "13d28b6fcef8158ddaa1f593ec4e69ba1c3ee21716fbb5f2a48bb129c074d387",
+      "byteLength": 748726
+    }
+  }
+}

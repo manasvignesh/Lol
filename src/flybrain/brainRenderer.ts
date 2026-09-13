@@ -1,24 +1,89 @@
+import * as T from "three";
 import type {
   ActivePathwayNode,
   ConnectomeCSRGraph,
+  MorphologyData,
   NeuralTelemetrySnapshot,
   NeuronData,
   NeuronDetailData,
+  NeuronMorphologyMeta,
   NeuronTelemetryItem,
   NeuropilRegion,
 } from "./types";
 
-export type BrainViewMode = "circuit" | "spatial" | "raster";
+export type BrainViewMode = "morphology" | "circuit" | "spatial" | "raster";
+export type BrainColorMode = "activity" | "anatomy";
+
+// Region color palette (Biological connectomics convention)
+export const REGION_COLORS: Record<
+  NeuropilRegion | string,
+  [number, number, number]
+> = {
+  OpticLobe: [0.0, 0.85, 1.0], // Cyan / Electric Blue (Vision, LC4/LC10)
+  CentralComplex: [0.1, 0.95, 0.6], // Emerald / Teal (Compass, EPG/PEN/PFL)
+  Protocerebrum: [0.65, 0.45, 1.0], // Indigo / Violet (Intermediate routing, LAL)
+  Descending: [1.0, 0.65, 0.1], // Amber / Orange (Motor commands, DNa02/DNp01)
+  VNC: [1.0, 0.25, 0.35], // Rose / Red (Motor effectors)
+};
+
+export const REGION_HEX: Record<NeuropilRegion | string, string> = {
+  OpticLobe: "#00d9ff",
+  CentralComplex: "#10f09a",
+  Protocerebrum: "#a773ff",
+  Descending: "#ffaa1a",
+  VNC: "#ff4455",
+};
 
 export class BrainRenderer {
-  private canvas: HTMLCanvasElement;
+  private container: HTMLElement;
+  private canvas2d: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+
+  // Three.js 3D WebGL Subsystem
+  private threeRenderer: T.WebGLRenderer;
+  private scene: T.Scene;
+  private camera: T.PerspectiveCamera;
+  private morphologyGroup: T.Group;
+  private lineMesh: T.LineSegments | null = null;
+  private shaderMaterial: T.ShaderMaterial | null = null;
+  private activityTexture: T.DataTexture | null = null;
+  private activityData: Float32Array | null = null; // 64x64x4 RGBA float
+
+  // Scale bar 3D object
+  private scaleBarGroup: T.Group;
+
+  // Data & State
   private graph: ConnectomeCSRGraph | null = null;
-  private viewMode: BrainViewMode = "circuit";
-  private hoveredNeuron: NeuronTelemetryItem | null = null;
+  private morphology: MorphologyData | null = null;
+  private viewMode: BrainViewMode = "morphology";
+  private colorMode: BrainColorMode = "activity";
+
+  private hoveredNeuronIndex: number | null = null;
+  private hoveredNeuronItem: NeuronTelemetryItem | null = null;
   private selectedNeuronIndex: number | null = null;
+
   private width = 420;
   private height = 520;
+  private isPaused = false;
+  private isMicroscope = false;
+
+  // Camera Orbit Controls
+  private rotX = 0.25;
+  private rotY = 0.0;
+  private targetRotX = 0.25;
+  private targetRotY = 0.0;
+  private cameraDistance = 3.2;
+  private targetCameraDistance = 3.2;
+  private panX = 0;
+  private panY = 0;
+  private isDragging = false;
+  private isPanning = false;
+  private lastMouseX = 0;
+  private lastMouseY = 0;
+
+  // Temporal Decay & History
+  private spikeExcitation: Float32Array = new Float32Array(2439);
+  private lastRenderTime = performance.now();
   private spikeHistory: { time: number; neuronIndex: number }[] = [];
   private rateHistory: {
     time: number;
@@ -27,13 +92,10 @@ export class BrainRenderer {
     descending: number;
   }[] = [];
   private pulsePhase = 0;
-  private representativeIndices: number[] = [];
+  private lastTelemetry: NeuralTelemetrySnapshot | null = null;
+
   private inDegrees: Int32Array | null = null;
   private inSynapseSums: Int32Array | null = null;
-  private isPaused = false;
-  private rotY = 0;
-  private isDragging = false;
-  private lastMouseX = 0;
 
   public onNeuronSelected?: (
     item: NeuronTelemetryItem,
@@ -41,14 +103,56 @@ export class BrainRenderer {
   ) => void;
 
   constructor(container: HTMLElement) {
-    this.canvas = document.createElement("canvas");
-    this.canvas.className = "brain-canvas";
-    this.canvas.style.width = "100%";
-    this.canvas.style.height = "100%";
-    this.canvas.style.display = "block";
-    container.appendChild(this.canvas);
+    this.container = container;
+    container.style.position = "relative";
+    container.style.overflow = "hidden";
 
-    const ctx = this.canvas.getContext("2d");
+    // 1. Setup Three.js WebGL renderer
+    this.threeRenderer = new T.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance",
+    });
+    this.threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.threeRenderer.setSize(this.width, this.height);
+    this.threeRenderer.domElement.className = "brain-three-canvas";
+    this.threeRenderer.domElement.style.position = "absolute";
+    this.threeRenderer.domElement.style.top = "0";
+    this.threeRenderer.domElement.style.left = "0";
+    this.threeRenderer.domElement.style.width = "100%";
+    this.threeRenderer.domElement.style.height = "100%";
+    this.threeRenderer.domElement.style.display = "block";
+    container.appendChild(this.threeRenderer.domElement);
+
+    // 2. Setup Three.js Scene & Camera
+    this.scene = new T.Scene();
+    this.camera = new T.PerspectiveCamera(
+      45,
+      this.width / this.height,
+      0.05,
+      50,
+    );
+    this.camera.position.set(0, 0, this.cameraDistance);
+    this.camera.lookAt(0, 0, 0);
+
+    this.morphologyGroup = new T.Group();
+    this.scene.add(this.morphologyGroup);
+
+    this.scaleBarGroup = new T.Group();
+    this.scene.add(this.scaleBarGroup);
+
+    // 3. Setup 2D Canvas for Circuit/Raster/Overlays
+    this.canvas2d = document.createElement("canvas");
+    this.canvas2d.className = "brain-2d-canvas";
+    this.canvas2d.style.position = "absolute";
+    this.canvas2d.style.top = "0";
+    this.canvas2d.style.left = "0";
+    this.canvas2d.style.width = "100%";
+    this.canvas2d.style.height = "100%";
+    this.canvas2d.style.pointerEvents = "none";
+    container.appendChild(this.canvas2d);
+
+    const ctx = this.canvas2d.getContext("2d");
     if (!ctx)
       throw new Error("Could not get 2D canvas context for BrainRenderer");
     this.ctx = ctx;
@@ -59,34 +163,185 @@ export class BrainRenderer {
 
   setGraph(graph: ConnectomeCSRGraph) {
     this.graph = graph;
-    this.buildRepresentativeSet();
     this.precomputeConnectivity();
+    if (this.spikeExcitation.length !== graph.neurons.length) {
+      this.spikeExcitation = new Float32Array(graph.neurons.length);
+    }
   }
 
-  private buildRepresentativeSet() {
-    if (!this.graph) return;
-    const neurons = this.graph.neurons;
-    const rep: number[] = [];
+  setMorphology(morphology: MorphologyData) {
+    this.morphology = morphology;
+    this.buildMorphologyGeometry();
+    this.buildScaleBar();
+  }
 
-    // Prioritize key seed populations, descending channels, and visual VPNs
-    for (let i = 0; i < neurons.length; i++) {
-      const n = neurons[i];
-      const t = n.type || "";
-      const isKey =
-        t.startsWith("LC") ||
-        t.startsWith("LPLC") ||
-        t.startsWith("EPG") ||
-        t.startsWith("PEN") ||
-        t.startsWith("PFL") ||
-        t.startsWith("DN") ||
-        t.startsWith("MDN") ||
-        n.region === "Descending" ||
-        n.region === "CentralComplex" ||
-        i % 3 === 0;
+  private buildMorphologyGeometry() {
+    if (!this.morphology) return;
+    const morph = this.morphology;
+    const totalSegments = morph.manifest.totalSegments;
+    const totalVertices = totalSegments * 2;
 
-      if (isKey) rep.push(i);
+    // Remove existing mesh
+    if (this.lineMesh) {
+      this.morphologyGroup.remove(this.lineMesh);
+      this.lineMesh.geometry.dispose();
+      this.lineMesh = null;
     }
-    this.representativeIndices = rep;
+
+    const geometry = new T.BufferGeometry();
+
+    // 1. Position attribute [x, y, z] flat array of segment endpoints
+    geometry.setAttribute(
+      "position",
+      new T.BufferAttribute(morph.positions, 3),
+    );
+
+    // 2. Vertex neuron index attribute (float for shader lookup)
+    const neuronIndices = new Float32Array(totalVertices);
+    // 3. Region base color attribute (RGB)
+    const regionColors = new Float32Array(totalVertices * 3);
+
+    for (let seg = 0; seg < totalSegments; seg++) {
+      const neuronIdx = morph.segmentBodyIds[seg];
+      const v1 = seg * 2;
+      const v2 = v1 + 1;
+
+      neuronIndices[v1] = neuronIdx;
+      neuronIndices[v2] = neuronIdx;
+
+      const meta = morph.meta[neuronIdx];
+      const region = meta?.region || "Protocerebrum";
+      const rgb = REGION_COLORS[region] || [0.5, 0.5, 0.6];
+
+      regionColors[v1 * 3] = rgb[0];
+      regionColors[v1 * 3 + 1] = rgb[1];
+      regionColors[v1 * 3 + 2] = rgb[2];
+
+      regionColors[v2 * 3] = rgb[0];
+      regionColors[v2 * 3 + 1] = rgb[1];
+      regionColors[v2 * 3 + 2] = rgb[2];
+    }
+
+    geometry.setAttribute(
+      "aNeuronIndex",
+      new T.BufferAttribute(neuronIndices, 1),
+    );
+    geometry.setAttribute(
+      "aRegionColor",
+      new T.BufferAttribute(regionColors, 3),
+    );
+
+    // 4. Setup Activity Texture (64x64 float RGBA = 4096 capacity >= 2439 neurons)
+    const texSize = 64;
+    this.activityData = new Float32Array(texSize * texSize * 4);
+    this.activityTexture = new T.DataTexture(
+      this.activityData,
+      texSize,
+      texSize,
+      T.RGBAFormat,
+      T.FloatType,
+    );
+    this.activityTexture.minFilter = T.NearestFilter;
+    this.activityTexture.magFilter = T.NearestFilter;
+    this.activityTexture.needsUpdate = true;
+
+    // 5. Custom Vertex & Fragment Shader for Single-Draw-Call 60 FPS rendering
+    const vertexShader = `
+      attribute float aNeuronIndex;
+      attribute vec3 aRegionColor;
+
+      uniform sampler2D uActivityTex;
+      uniform float uColorMode;      // 0.0 = Activity, 1.0 = Anatomy
+      uniform float uSelectedNeuron; // -1.0 if none, else selected index
+      uniform float uDimOthers;      // 1.0 when a neuron is selected/isolated
+
+      varying vec4 vColor;
+
+      void main() {
+        float idx = aNeuronIndex;
+        float u = (mod(idx, 64.0) + 0.5) / 64.0;
+        float v = (floor(idx / 64.0) + 0.5) / 64.0;
+        vec4 act = texture2D(uActivityTex, vec2(u, v));
+
+        float firingRate = act.r;    // 0..1 normalized firing rate
+        float spikeDecay = act.g;    // 0..1 recent spike pulse with decay
+        float isHovered = act.b;     // 1.0 if hovered
+
+        // Biological resting baseline: subtle dark slate grey with delicate region tint
+        vec3 restSlate = vec3(0.16, 0.20, 0.27);
+        vec3 restAnatomy = aRegionColor * 0.75;
+        vec3 baseColor = mix(restSlate, restAnatomy, uColorMode);
+
+        // Active neural glow: electric cyan transitioning to bright white-gold on spike
+        vec3 pulseColor = mix(vec3(0.05, 0.92, 1.0), vec3(1.0, 0.98, 0.7), spikeDecay);
+
+        float excitation = max(firingRate * 0.85, spikeDecay);
+        vec3 finalColor = mix(baseColor, pulseColor, excitation);
+        float alpha = mix(0.32, 0.95, excitation);
+
+        // Selection / Hover highlight
+        bool isSelected = (uSelectedNeuron >= 0.0 && abs(idx - uSelectedNeuron) < 0.5);
+        if (isSelected || isHovered > 0.5) {
+          finalColor = vec3(1.0, 0.95, 0.25); // Vibrant golden arborization
+          alpha = 1.0;
+        } else if (uDimOthers > 0.5) {
+          alpha *= 0.12;
+          finalColor *= 0.35;
+        }
+
+        vColor = vec4(finalColor, alpha);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      precision highp float;
+      varying vec4 vColor;
+
+      void main() {
+        gl_FragColor = vColor;
+      }
+    `;
+
+    this.shaderMaterial = new T.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms: {
+        uActivityTex: { value: this.activityTexture },
+        uColorMode: { value: this.colorMode === "anatomy" ? 1.0 : 0.0 },
+        uSelectedNeuron: {
+          value:
+            this.selectedNeuronIndex !== null ? this.selectedNeuronIndex : -1.0,
+        },
+        uDimOthers: { value: this.selectedNeuronIndex !== null ? 1.0 : 0.0 },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: T.AdditiveBlending,
+    });
+
+    this.lineMesh = new T.LineSegments(geometry, this.shaderMaterial);
+    this.morphologyGroup.add(this.lineMesh);
+  }
+
+  private buildScaleBar() {
+    if (!this.morphology) return;
+    // Clear existing scale bar
+    while (this.scaleBarGroup.children.length > 0) {
+      const c = this.scaleBarGroup.children[0];
+      this.scaleBarGroup.remove(c);
+      if ((c as any).geometry) (c as any).geometry.dispose();
+    }
+
+    const scale100um = this.morphology.manifest.transform.scaleBar100umUnits;
+    // 3D scale bar line positioned at bottom left of the brain
+    const barGeo = new T.BufferGeometry().setFromPoints([
+      new T.Vector3(-0.7, -0.75, 0),
+      new T.Vector3(-0.7 + scale100um, -0.75, 0),
+    ]);
+    const barMat = new T.LineBasicMaterial({ color: 0x88bbdd, linewidth: 2 });
+    const barLine = new T.Line(barGeo, barMat);
+    this.scaleBarGroup.add(barLine);
   }
 
   private precomputeConnectivity() {
@@ -114,6 +369,68 @@ export class BrainRenderer {
     }
   }
 
+  setViewMode(mode: BrainViewMode) {
+    this.viewMode = mode;
+    if (mode === "morphology" || mode === "spatial") {
+      this.threeRenderer.domElement.style.display = "block";
+      this.canvas2d.style.pointerEvents = "none";
+    } else {
+      this.threeRenderer.domElement.style.display = "none";
+      this.canvas2d.style.pointerEvents = "auto";
+    }
+    this.resize();
+  }
+
+  getViewMode(): BrainViewMode {
+    return this.viewMode;
+  }
+
+  setColorMode(mode: BrainColorMode) {
+    this.colorMode = mode;
+    if (this.shaderMaterial) {
+      this.shaderMaterial.uniforms.uColorMode.value =
+        mode === "anatomy" ? 1.0 : 0.0;
+    }
+  }
+
+  getColorMode(): BrainColorMode {
+    return this.colorMode;
+  }
+
+  setPaused(paused: boolean) {
+    this.isPaused = paused;
+  }
+
+  setMicroscopeMode(enabled: boolean) {
+    this.isMicroscope = enabled;
+    this.resize();
+  }
+
+  resetCamera() {
+    this.targetRotX = 0.25;
+    this.targetRotY = 0.0;
+    this.targetCameraDistance = 3.2;
+    this.panX = 0;
+    this.panY = 0;
+  }
+
+  selectNeuronByIndex(index: number | null) {
+    this.selectedNeuronIndex = index;
+    if (this.shaderMaterial) {
+      this.shaderMaterial.uniforms.uSelectedNeuron.value =
+        index !== null ? index : -1.0;
+      this.shaderMaterial.uniforms.uDimOthers.value =
+        index !== null ? 1.0 : 0.0;
+    }
+    if (index !== null) {
+      const details = this.getNeuronDetails(index);
+      const item = this.lastTelemetry?.neurons[index];
+      if (details && item && this.onNeuronSelected) {
+        this.onNeuronSelected(item, details);
+      }
+    }
+  }
+
   getNeuronDetails(index: number): NeuronDetailData | null {
     if (!this.graph || index < 0 || index >= this.graph.neurons.length)
       return null;
@@ -134,7 +451,6 @@ export class BrainRenderer {
     const inSynapses = this.inSynapseSums
       ? this.inSynapseSums[index]
       : inDegree;
-
     const telemItem = this.lastTelemetry?.neurons[index];
 
     return {
@@ -157,142 +473,174 @@ export class BrainRenderer {
     };
   }
 
-  setViewMode(mode: BrainViewMode) {
-    this.viewMode = mode;
-  }
-
-  getViewMode(): BrainViewMode {
-    return this.viewMode;
-  }
-
-  setPaused(paused: boolean) {
-    this.isPaused = paused;
-  }
-
-  selectNeuronByIndex(index: number) {
-    this.selectedNeuronIndex = index;
-    const details = this.getNeuronDetails(index);
-    const item = this.lastTelemetry?.neurons[index];
-    if (details && item && this.onNeuronSelected) {
-      this.onNeuronSelected(item, details);
-    }
-  }
-
   resize() {
-    const rect = this.canvas.parentElement?.getBoundingClientRect() || {
-      width: 420,
-      height: 520,
-    };
+    const rect = this.container.getBoundingClientRect();
+    this.width = Math.max(200, rect.width || 420);
+    this.height = Math.max(200, rect.height || 520);
+
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.width = Math.max(200, rect.width);
-    this.height = Math.max(200, rect.height);
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
-    this.ctx.scale(dpr, dpr);
+
+    // Resize Three.js
+    this.camera.aspect = this.width / this.height;
+    this.camera.updateProjectionMatrix();
+    this.threeRenderer.setSize(this.width, this.height);
+    this.threeRenderer.setPixelRatio(dpr);
+
+    // Resize 2D Canvas
+    this.canvas2d.width = this.width * dpr;
+    this.canvas2d.height = this.height * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   private setupListeners() {
     window.addEventListener("resize", () => this.resize());
 
-    this.canvas.addEventListener("mousedown", (e) => {
+    const dom = this.container;
+
+    dom.addEventListener("mousedown", (e) => {
       this.isDragging = true;
+      this.isPanning = e.button === 2 || e.shiftKey;
       this.lastMouseX = e.clientX;
+      this.lastMouseY = e.clientY;
     });
 
     window.addEventListener("mouseup", () => {
       this.isDragging = false;
+      this.isPanning = false;
     });
 
-    this.canvas.addEventListener("mousemove", (e) => {
-      const rect = this.canvas.getBoundingClientRect();
+    dom.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    dom.addEventListener("mousemove", (e) => {
+      const rect = dom.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
 
-      if (this.isDragging && this.viewMode === "spatial") {
+      if (this.isDragging) {
         const dx = e.clientX - this.lastMouseX;
-        this.rotY += dx * 0.012;
+        const dy = e.clientY - this.lastMouseY;
+
+        if (this.isPanning) {
+          this.panX += dx * 0.003 * this.cameraDistance;
+          this.panY -= dy * 0.003 * this.cameraDistance;
+        } else {
+          this.targetRotY += dx * 0.01;
+          this.targetRotX = Math.max(
+            -1.4,
+            Math.min(1.4, this.targetRotX + dy * 0.01),
+          );
+        }
+
         this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
       }
 
-      this.checkHover(mx, my);
+      if (this.viewMode === "morphology" || this.viewMode === "spatial") {
+        this.checkRaycastHover(mx, my);
+      }
     });
 
-    this.canvas.addEventListener("mouseleave", () => {
-      this.hoveredNeuron = null;
+    dom.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+        this.targetCameraDistance = Math.max(
+          0.6,
+          Math.min(8.0, this.targetCameraDistance * zoomFactor),
+        );
+      },
+      { passive: false },
+    );
+
+    dom.addEventListener("mouseleave", () => {
+      this.hoveredNeuronIndex = null;
+      this.hoveredNeuronItem = null;
       this.isDragging = false;
     });
 
-    this.canvas.addEventListener("click", (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      // Check active pathway clicks first
-      if (this.lastTelemetry?.activePathway) {
-        const path = this.lastTelemetry.activePathway;
-        const boxY = this.height - 110;
-        if (my >= boxY && my <= boxY + 40) {
-          const slotW = (this.width - 32) / Math.max(1, path.length);
-          const clickedSlot = Math.floor((mx - 16) / slotW);
-          if (clickedSlot >= 0 && clickedSlot < path.length) {
-            this.selectNeuronByIndex(path[clickedSlot].index);
-            return;
-          }
-        }
-      }
-
-      if (this.hoveredNeuron) {
-        this.selectNeuronByIndex(this.hoveredNeuron.index);
+    dom.addEventListener("click", (e) => {
+      if (this.hoveredNeuronIndex !== null) {
+        this.selectNeuronByIndex(this.hoveredNeuronIndex);
+      } else {
+        // Deselect if clicked empty space
+        this.selectNeuronByIndex(null);
       }
     });
   }
 
-  private checkHover(mx: number, my: number) {
-    if (!this.lastTelemetry || !this.graph) return;
+  private checkRaycastHover(screenX: number, screenY: number) {
+    if (!this.morphology || !this.lastTelemetry) return;
 
-    let closest: NeuronTelemetryItem | null = null;
-    let minDist = 20;
+    // Convert screen coordinates to Normalized Device Coordinates (-1 to +1)
+    const ndcX = (screenX / this.width) * 2 - 1;
+    const ndcY = -(screenY / this.height) * 2 + 1;
 
-    const subset =
-      this.representativeIndices.length > 0
-        ? this.representativeIndices
-        : this.lastTelemetry.neurons.map((_, i) => i);
+    const raycaster = new T.Raycaster();
+    raycaster.setFromCamera(new T.Vector2(ndcX, ndcY), this.camera);
+    const ray = raycaster.ray;
 
-    for (const idx of subset) {
-      const item = this.lastTelemetry.neurons[idx];
-      if (!item) continue;
-      const pos =
-        this.viewMode === "spatial"
-          ? this.getSpatialScreenPos(idx, this.width, this.height)
-          : this.getNeuronScreenPos(idx);
-      const dx = mx - pos.x;
-      const dy = my - pos.y;
-      const d = Math.sqrt(dx * dx + dy * dy);
-      if (d < minDist) {
-        minDist = d;
-        closest = item;
+    let closestIdx: number | null = null;
+    let minDistanceToRay = 0.09 * (this.cameraDistance / 3.0); // Picking threshold in 3D units
+
+    const metaList = this.morphology.meta;
+    for (let i = 0; i < metaList.length; i++) {
+      const meta = metaList[i];
+      if (!meta.hasMorphology) continue;
+
+      const [cx, cy, cz] = meta.centroid;
+      const centroidVec = new T.Vector3(cx, cy, cz);
+      centroidVec.applyMatrix4(this.morphologyGroup.matrixWorld);
+
+      const dist = ray.distanceToPoint(centroidVec);
+      if (dist < minDistanceToRay) {
+        minDistanceToRay = dist;
+        closestIdx = i;
       }
     }
-    this.hoveredNeuron = closest;
-  }
 
-  private lastTelemetry: NeuralTelemetrySnapshot | null = null;
+    this.hoveredNeuronIndex = closestIdx;
+    this.hoveredNeuronItem =
+      closestIdx !== null ? this.lastTelemetry.neurons[closestIdx] : null;
+  }
 
   render(telemetry: NeuralTelemetrySnapshot | null) {
     if (!telemetry || !this.graph) return;
     this.lastTelemetry = telemetry;
+
+    const now = performance.now();
+    const dt = Math.min(
+      0.1,
+      Math.max(0.001, (now - this.lastRenderTime) / 1000),
+    );
+    this.lastRenderTime = now;
     this.pulsePhase += 0.05;
 
-    if (!this.isDragging && this.viewMode === "spatial") {
-      this.rotY += 0.003; // Subtle organic rotation
+    // Smooth camera interpolation
+    this.rotX += (this.targetRotX - this.rotX) * 0.15;
+    this.rotY += (this.targetRotY - this.rotY) * 0.15;
+    this.cameraDistance +=
+      (this.targetCameraDistance - this.cameraDistance) * 0.15;
+
+    // Subtle idle auto-rotation
+    if (
+      !this.isDragging &&
+      !this.isPaused &&
+      (this.viewMode === "morphology" || this.viewMode === "spatial")
+    ) {
+      this.targetRotY += 0.0025;
     }
 
-    // Record spikes if not paused
-    const now = performance.now();
+    // Update Spike History & Temporal Rate Decays
     if (!this.isPaused) {
       for (let i = 0; i < telemetry.neurons.length; i++) {
-        if (telemetry.neurons[i]?.spiking) {
+        const item = telemetry.neurons[i];
+        if (item?.spiking) {
+          this.spikeExcitation[i] = 1.0;
           this.spikeHistory.push({ time: now, neuronIndex: i });
+        } else {
+          // Exponential decay (~150ms half-life)
+          this.spikeExcitation[i] *= Math.exp(-dt / 0.15);
         }
       }
       this.spikeHistory = this.spikeHistory.filter((s) => now - s.time < 1200);
@@ -306,36 +654,122 @@ export class BrainRenderer {
       if (this.rateHistory.length > 80) this.rateHistory.shift();
     }
 
-    const ctx = this.ctx;
     const w = this.width;
     const h = this.height;
 
+    if (this.viewMode === "morphology" || this.viewMode === "spatial") {
+      this.renderMorphology3D(telemetry, w, h);
+    } else {
+      this.render2DViews(telemetry, w, h);
+    }
+  }
+
+  private renderMorphology3D(
+    telemetry: NeuralTelemetrySnapshot,
+    w: number,
+    h: number,
+  ) {
+    // 1. Update Dynamic GPU Activity Texture Buffer
+    if (this.activityData && this.activityTexture) {
+      const neurons = telemetry.neurons;
+      for (let i = 0; i < neurons.length; i++) {
+        const item = neurons[i];
+        const baseIdx = i * 4;
+        const firingNorm = Math.min(1.0, (item?.firingRateHz || 0) / 120.0);
+        const spikeDecay = this.spikeExcitation[i] || 0.0;
+        const isHovered = this.hoveredNeuronIndex === i ? 1.0 : 0.0;
+
+        this.activityData[baseIdx] = firingNorm;
+        this.activityData[baseIdx + 1] = spikeDecay;
+        this.activityData[baseIdx + 2] = isHovered;
+        this.activityData[baseIdx + 3] = 1.0;
+      }
+      this.activityTexture.needsUpdate = true;
+    }
+
+    // 2. Position Camera & Morphology Group
+    this.morphologyGroup.rotation.x = this.rotX;
+    this.morphologyGroup.rotation.y = this.rotY;
+    this.morphologyGroup.position.set(this.panX, this.panY, 0);
+
+    this.scaleBarGroup.position.set(this.panX, this.panY, 0);
+    this.scaleBarGroup.rotation.x = this.rotX;
+    this.scaleBarGroup.rotation.y = this.rotY;
+
+    this.camera.position.set(0, 0, this.cameraDistance);
+    this.camera.lookAt(0, 0, 0);
+
+    // 3. Render WebGL Scene
+    this.threeRenderer.render(this.scene, this.camera);
+
+    // 4. Draw 2D HUD Overlays (Scale Bar Badge, Tooltip, Active Pathway)
+    const ctx = this.ctx;
     ctx.clearRect(0, 0, w, h);
 
-    // High-tech dark background with subtle blueprint grid
+    this.drawScaleBarBadge(w, h);
+    this.drawSensoryMotorBar(telemetry, w, h);
+
+    if (this.hoveredNeuronItem && this.hoveredNeuronIndex !== null) {
+      this.drawTooltip(this.hoveredNeuronItem, w, h);
+    }
+  }
+
+  private drawScaleBarBadge(w: number, h: number) {
+    const ctx = this.ctx;
+    const barY = h - 38;
+    const barX = 16;
+
+    // Authentic Scale Bar overlay
+    ctx.save();
+    ctx.fillStyle = "rgba(10, 20, 28, 0.85)";
+    ctx.strokeStyle = "rgba(69, 208, 223, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(barX - 4, barY - 18, 180, 28, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Scale Line (matches MaleCNS EM 100um)
+    ctx.strokeStyle = "#45d0df";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(barX + 4, barY - 2);
+    ctx.lineTo(barX + 44, barY - 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#e6f8fa";
+    ctx.font = "600 10px monospace";
+    ctx.fillText("100 µm (MaleCNS EM)", barX + 50, barY + 1);
+    ctx.restore();
+  }
+
+  private render2DViews(
+    telemetry: NeuralTelemetrySnapshot,
+    w: number,
+    h: number,
+  ) {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, w, h);
+
+    // High-tech dark background with subtle grid
     ctx.fillStyle = "rgba(8, 16, 22, 0.96)";
     ctx.fillRect(0, 0, w, h);
-
     this.drawGrid(w, h);
 
     if (this.viewMode === "circuit") {
       this.drawCircuitView(telemetry, w, h);
-    } else if (this.viewMode === "spatial") {
-      this.drawSpatialView(telemetry, w, h);
-    } else {
+    } else if (this.viewMode === "raster") {
       this.drawRasterView(telemetry, w, h);
     }
 
-    // Active pathway trace overlay
     if (telemetry.activePathway && telemetry.activePathway.length > 0) {
       this.drawActivePathway(telemetry.activePathway, w, h);
     }
 
     this.drawSensoryMotorBar(telemetry, w, h);
 
-    // Tooltip
-    if (this.hoveredNeuron) {
-      this.drawTooltip(this.hoveredNeuron, w, h);
+    if (this.hoveredNeuronItem) {
+      this.drawTooltip(this.hoveredNeuronItem, w, h);
     }
   }
 
@@ -355,9 +789,6 @@ export class BrainRenderer {
     ctx.stroke();
   }
 
-  /**
-   * 1. CIRCUIT FLOW VIEW: Layered functional compartments with dynamic propagation
-   */
   private drawCircuitView(
     telemetry: NeuralTelemetrySnapshot,
     w: number,
@@ -399,337 +830,132 @@ export class BrainRenderer {
         color: "#61e89b",
       },
       {
-        name: "4. DESCENDING OUTPUT (Brain ➔ VNC)",
-        subtext: "DNa01/02 Steering · DNp01 Thrust · DNb01/GF Strike",
+        name: "4. DESCENDING MOTOR COMMANDS (DNs)",
+        subtext:
+          "DNa02 Steering Asymmetry · DNp01 Forward Thrust · MDN Braking",
         key: "Descending",
         y: 248,
         h: 65,
-        color: "#f7b731",
+        color: "#ffaa1a",
       },
       {
-        name: "5. ENGINEERED EMBODIMENT",
-        subtext: "Court Flight Velocity (vx, vz) · Swept Racket Return",
+        name: "5. VNC MOTOR EFFECTORS",
+        subtext: "Wing Stroke Amplitude · Physical Racket Kinematics",
         key: "VNC",
         y: 323,
-        h: 65,
-        color: "#ff5e7e",
+        h: 55,
+        color: "#ff5252",
       },
     ];
 
-    for (const c of compartments) {
-      const act = telemetry.regionActivity[c.key] || 0;
-      const normAct = Math.min(1.0, act / 35.0);
+    for (const comp of compartments) {
+      const act = telemetry.regionActivity[comp.key] || 0;
+      const isHot = act > 0.08;
 
-      // Compartment Box
-      ctx.fillStyle = `rgba(14, 26, 34, ${0.45 + normAct * 0.25})`;
+      ctx.fillStyle = isHot
+        ? "rgba(20, 38, 48, 0.75)"
+        : "rgba(12, 22, 30, 0.45)";
+      ctx.strokeStyle = isHot ? comp.color : "rgba(50, 80, 92, 0.4)";
+      ctx.lineWidth = isHot ? 1.5 : 1;
       ctx.beginPath();
-      ctx.roundRect(10, c.y, w - 20, c.h, 6);
+      ctx.roundRect(14, comp.y, w - 28, comp.h, 6);
       ctx.fill();
-
-      ctx.strokeStyle = c.color;
-      ctx.globalAlpha = 0.25 + normAct * 0.55;
-      ctx.lineWidth = 1.2;
       ctx.stroke();
-      ctx.globalAlpha = 1.0;
 
-      // Activity Energy Bar on left edge
-      ctx.fillStyle = c.color;
-      ctx.fillRect(10, c.y, 4, c.h * normAct);
+      ctx.fillStyle = isHot ? "#e6f8fa" : "#8caab5";
+      ctx.font = "bold 11px system-ui, sans-serif";
+      ctx.fillText(comp.name, 22, comp.y + 16);
 
-      // Title & Subtitle
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 9.5px monospace";
-      ctx.fillText(c.name, 20, c.y + 14);
+      ctx.fillStyle = "rgba(140, 170, 181, 0.75)";
+      ctx.font = "9px system-ui, sans-serif";
+      ctx.fillText(comp.subtext, 22, comp.y + 28);
 
-      ctx.fillStyle = c.color;
+      const barW = Math.min(100, Math.max(0, act * 100));
+      ctx.fillStyle = "rgba(18, 30, 38, 0.8)";
+      ctx.fillRect(w - 130, comp.y + 8, 104, 10);
+      ctx.fillStyle = comp.color;
+      ctx.fillRect(w - 128, comp.y + 10, barW, 6);
+
+      ctx.fillStyle = isHot ? comp.color : "#6c8c99";
       ctx.font = "bold 9px monospace";
-      ctx.fillText(`[${act.toFixed(1)} Hz]`, w - 75, c.y + 14);
-
-      ctx.fillStyle = "rgba(180, 205, 215, 0.7)";
-      ctx.font = "8px sans-serif";
-      ctx.fillText(c.subtext, 20, c.y + 26);
-    }
-
-    // Draw active biological synapse connections
-    ctx.lineWidth = 1.0;
-    const subset = this.representativeIndices;
-    for (let s = 0; s < subset.length; s += 2) {
-      const i = subset[s];
-      const p1 = this.getNeuronScreenPos(i);
-      const start = this.graph.indptr[i];
-      const end = Math.min(start + 3, this.graph.indptr[i + 1]);
-
-      for (let k = start; k < end; k++) {
-        const post = this.graph.indices[k];
-        const p2 = this.getNeuronScreenPos(post);
-        const sign = this.graph.signs[k];
-        const preSpiking = telemetry.neurons[i]?.spiking;
-
-        ctx.strokeStyle =
-          sign > 0 ? "rgba(97, 232, 155, 0.08)" : "rgba(255, 94, 126, 0.08)";
-        if (preSpiking) {
-          ctx.strokeStyle =
-            sign > 0 ? "rgba(97, 232, 155, 0.85)" : "rgba(255, 94, 126, 0.85)";
-          ctx.lineWidth = 1.6;
-        } else {
-          ctx.lineWidth = 0.7;
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      }
-    }
-
-    // Draw representative neurons
-    for (const idx of subset) {
-      const n = telemetry.neurons[idx];
-      if (!n) continue;
-      const pos = this.getNeuronScreenPos(idx);
-      this.drawNeuronNode(pos.x, pos.y, n, idx === this.selectedNeuronIndex);
+      ctx.fillText(`${(act * 100).toFixed(0)}%`, w - 22, comp.y + 16);
     }
   }
 
-  /**
-   * 2. CONNECTOME VIEW: 3D MaleCNS Anatomical Layout with EM Voxel Coordinates
-   */
-  private drawSpatialView(
-    telemetry: NeuralTelemetrySnapshot,
-    w: number,
-    h: number,
-  ) {
-    const ctx = this.ctx;
-    if (!this.graph) return;
-
-    ctx.fillStyle = "rgba(69, 208, 223, 0.75)";
-    ctx.font = "bold 9.5px monospace";
-    ctx.fillText(`3D MALECNS v1.0 ANATOMICAL GRAPH`, 14, 20);
-
-    ctx.fillStyle = "rgba(160, 185, 195, 0.6)";
-    ctx.font = "8.5px sans-serif";
-    ctx.fillText(
-      `Drag to rotate · Showing ${this.representativeIndices.length} representative neurons`,
-      14,
-      32,
-    );
-
-    const subset = this.representativeIndices;
-    // Synaptic connections
-    for (let s = 0; s < subset.length; s += 2) {
-      const i = subset[s];
-      const p1 = this.getSpatialScreenPos(i, w, h);
-      const start = this.graph.indptr[i];
-      const end = Math.min(start + 2, this.graph.indptr[i + 1]);
-
-      for (let k = start; k < end; k++) {
-        const post = this.graph.indices[k];
-        const p2 = this.getSpatialScreenPos(post, w, h);
-        const preSpike = telemetry.neurons[i]?.spiking;
-
-        ctx.strokeStyle = preSpike
-          ? "rgba(255, 255, 255, 0.85)"
-          : "rgba(69, 208, 223, 0.08)";
-        ctx.lineWidth = preSpike ? 1.8 : 0.7;
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      }
-    }
-
-    // Draw neurons
-    for (const idx of subset) {
-      const n = telemetry.neurons[idx];
-      if (!n) continue;
-      const pos = this.getSpatialScreenPos(idx, w, h);
-      this.drawNeuronNode(pos.x, pos.y, n, idx === this.selectedNeuronIndex);
-    }
-  }
-
-  /**
-   * 3. SPIKE VIEW: Multi-Population Raster & Rate Oscilloscope
-   */
   private drawRasterView(
     telemetry: NeuralTelemetrySnapshot,
     w: number,
     h: number,
   ) {
     const ctx = this.ctx;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-    ctx.font = "bold 10px monospace";
-    ctx.fillText(`SPIKE RASTER & POPULATION OSCILLOSCOPE`, 14, 20);
-
     const now = performance.now();
-    const chartY = 32;
-    const chartH = 175;
+    const plotX = 50;
+    const plotY = 30;
+    const plotW = w - 65;
+    const plotH = h - 160;
 
-    // Raster background box
-    ctx.fillStyle = "rgba(10, 20, 26, 0.6)";
-    ctx.fillRect(14, chartY, w - 28, chartH);
-    ctx.strokeStyle = "rgba(69, 208, 223, 0.25)";
-    ctx.strokeRect(14, chartY, w - 28, chartH);
+    ctx.fillStyle = "rgba(6, 12, 18, 0.8)";
+    ctx.fillRect(plotX, plotY, plotW, plotH);
+    ctx.strokeStyle = "rgba(42, 75, 84, 0.4)";
+    ctx.strokeRect(plotX, plotY, plotW, plotH);
 
-    // Draw spike dots
-    ctx.fillStyle = "rgba(69, 208, 223, 0.9)";
-    const totalN = this.graph?.neurons.length || 2439;
+    ctx.fillStyle = "#8caab5";
+    ctx.font = "10px monospace";
+    ctx.fillText("LIF SPIKE RASTER (PAST 1.2 SECONDS)", plotX, plotY - 8);
+
+    const timeWindow = 1200;
+    const totalNeurons = this.graph?.neurons.length || 2439;
+
     for (const spike of this.spikeHistory) {
-      const age = (now - spike.time) / 1200; // 0 to 1
-      const x = w - 16 - age * (w - 32);
-      const y = chartY + (spike.neuronIndex / totalN) * chartH;
-      ctx.fillRect(x, y, 2.2, 2.2);
-    }
+      const dt = now - spike.time;
+      if (dt < 0 || dt > timeWindow) continue;
 
-    // Multi-region firing rate curves
-    const curveY = chartY + chartH + 18;
-    const curveH = 85;
+      const sx = plotX + plotW - (dt / timeWindow) * plotW;
+      const sy = plotY + (spike.neuronIndex / totalNeurons) * plotH;
 
-    ctx.fillStyle = "rgba(10, 20, 26, 0.6)";
-    ctx.fillRect(14, curveY, w - 28, curveH);
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-    ctx.strokeRect(14, curveY, w - 28, curveH);
-
-    const drawCurve = (
-      rates: number[],
-      color: string,
-      label: string,
-      offsetIdx: number,
-    ) => {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      for (let i = 0; i < rates.length; i++) {
-        const x = 14 + (i / Math.max(1, rates.length - 1)) * (w - 28);
-        const val = Math.min(100, rates[i]) / 100;
-        const y = curveY + curveH - val * curveH;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      ctx.fillStyle = color;
-      ctx.font = "bold 8.5px monospace";
-      ctx.fillText(`${label}`, 18 + offsetIdx * 82, curveY - 4);
-    };
-
-    drawCurve(
-      this.rateHistory.map((r) => r.optic),
-      "#45d0df",
-      "OPTIC LOBE",
-      0,
-    );
-    drawCurve(
-      this.rateHistory.map((r) => r.central),
-      "#61e89b",
-      "CENTRAL CX",
-      1,
-    );
-    drawCurve(
-      this.rateHistory.map((r) => r.descending),
-      "#f7b731",
-      "DESCENDING",
-      2,
-    );
-  }
-
-  /**
-   * ACTIVE PATHWAY TRACE MODE: Highlights real sensorimotor transmission route
-   */
-  private drawActivePathway(path: ActivePathwayNode[], w: number, h: number) {
-    const ctx = this.ctx;
-    if (path.length < 2) return;
-
-    ctx.strokeStyle = "#ffd32a";
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = "#ffd32a";
-    ctx.shadowBlur = 8;
-
-    ctx.beginPath();
-    for (let i = 0; i < path.length; i++) {
-      const idx = path[i].index;
-      const pos =
-        this.viewMode === "spatial"
-          ? this.getSpatialScreenPos(idx, w, h)
-          : this.getNeuronScreenPos(idx);
-
-      if (i === 0) ctx.moveTo(pos.x, pos.y);
-      else ctx.lineTo(pos.x, pos.y);
-    }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Interactive clickable active pathway breadcrumbs in bottom corner
-    const boxY = h - 110;
-    ctx.fillStyle = "rgba(10, 20, 26, 0.94)";
-    ctx.fillRect(10, boxY, w - 20, 38);
-    ctx.strokeStyle = "#ffd32a";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(10, boxY, w - 20, 38);
-
-    ctx.fillStyle = "#ffd32a";
-    ctx.font = "bold 8.5px monospace";
-    ctx.fillText(
-      "⚡ ACTIVE CONNECTOME PATH (Click node to inspect):",
-      16,
-      boxY + 12,
-    );
-
-    const slotW = (w - 32) / Math.max(1, path.length);
-    for (let i = 0; i < path.length; i++) {
-      const p = path[i];
-      const px = 16 + i * slotW;
-      ctx.fillStyle = "rgba(255, 211, 42, 0.15)";
-      ctx.fillRect(px, boxY + 18, slotW - 6, 16);
-      ctx.strokeStyle = "rgba(255, 211, 42, 0.4)";
-      ctx.strokeRect(px, boxY + 18, slotW - 6, 16);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 8px monospace";
-      ctx.fillText(`${p.type}`, px + 3, boxY + 29);
+      const neuron = this.graph?.neurons[spike.neuronIndex];
+      const region = neuron?.region || "Protocerebrum";
+      ctx.fillStyle = REGION_HEX[region] || "#45d0df";
+      ctx.fillRect(sx, sy, 2, 2);
     }
   }
 
-  private drawNeuronNode(
-    x: number,
-    y: number,
-    item: NeuronTelemetryItem,
-    isSelected: boolean,
+  private drawActivePathway(
+    pathway: ActivePathwayNode[],
+    w: number,
+    h: number,
   ) {
     const ctx = this.ctx;
-    const isHovered = this.hoveredNeuron?.index === item.index;
-    const rate = item.firingRateHz;
+    const boxY = h - 110;
+    const boxH = 40;
+    const boxW = w - 28;
 
-    let baseColor = "#45d0df";
-    if (item.region === "CentralComplex") baseColor = "#61e89b";
-    else if (item.region === "Protocerebrum") baseColor = "#a55eea";
-    else if (item.region === "Descending") baseColor = "#f7b731";
-    else if (item.region === "VNC") baseColor = "#ff5e7e";
-
-    const radius = isSelected
-      ? 7.5
-      : isHovered
-        ? 6.5
-        : item.spiking
-          ? 5.2
-          : Math.max(2.4, Math.min(4.4, 2.4 + rate * 0.04));
-
-    if (item.spiking) {
-      // White glow halo
-      ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-      ctx.beginPath();
-      ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.fillStyle = item.spiking ? "#ffffff" : baseColor;
+    ctx.fillStyle = "rgba(10, 20, 28, 0.85)";
+    ctx.strokeStyle = "rgba(69, 208, 223, 0.5)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.roundRect(14, boxY, boxW, boxH, 6);
     ctx.fill();
+    ctx.stroke();
 
-    if (isHovered || isSelected) {
-      ctx.strokeStyle = isSelected ? "#ffd32a" : "#ffffff";
-      ctx.lineWidth = isSelected ? 2.2 : 1.5;
-      ctx.stroke();
+    ctx.fillStyle = "#45d0df";
+    ctx.font = "bold 9px monospace";
+    ctx.fillText("⚡ ACTIVE SENSORIMOTOR TRACE:", 20, boxY + 12);
+
+    const slotW = (boxW - 12) / Math.max(1, pathway.length);
+    for (let i = 0; i < pathway.length; i++) {
+      const node = pathway[i];
+      const nx = 20 + i * slotW;
+      const ny = boxY + 18;
+
+      ctx.fillStyle = REGION_HEX[node.region] || "#45d0df";
+      ctx.font = "bold 10px monospace";
+      ctx.fillText(`${node.type}`, nx, ny + 14);
+
+      if (i < pathway.length - 1) {
+        ctx.fillStyle = "rgba(140, 170, 181, 0.6)";
+        ctx.fillText("→", nx + slotW - 10, ny + 14);
+      }
     }
   }
 
@@ -739,153 +965,88 @@ export class BrainRenderer {
     h: number,
   ) {
     const ctx = this.ctx;
-    const barY = h - 68;
-    const barH = 58;
+    const barY = h - 60;
+    const barH = 20;
 
-    ctx.fillStyle = "rgba(12, 24, 32, 0.94)";
-    ctx.fillRect(10, barY, w - 20, barH);
-    ctx.strokeStyle = "rgba(69, 208, 223, 0.35)";
-    ctx.strokeRect(10, barY, w - 20, barH);
+    const steer =
+      telemetry.motorCommand.biological?.steeringTorque ??
+      telemetry.motorCommand.steerTorque ??
+      0;
+    const thrust =
+      telemetry.motorCommand.biological?.forwardThrust ??
+      telemetry.motorCommand.vz ??
+      0;
 
-    const f = telemetry.sensoryFeatures;
-    const m = telemetry.motorCommand;
+    ctx.fillStyle = "rgba(10, 22, 30, 0.9)";
+    ctx.fillRect(14, barY, w - 28, barH);
+    ctx.strokeStyle = "rgba(42, 75, 84, 0.6)";
+    ctx.strokeRect(14, barY, w - 28, barH);
 
-    ctx.fillStyle = "#e6f1eb";
-    ctx.font = "9px monospace";
+    ctx.fillStyle = "#8caab5";
+    ctx.font = "bold 9px monospace";
+    ctx.fillText("MOTOR OUTPUT:", 20, barY + 14);
 
-    // Row 1: Optical Sensory Kinematics
-    const loomTxt = f.isApproaching
-      ? `LOOM: ${(f.loomingRate * 1000).toFixed(0)} mrad/s`
-      : "LOOM: --";
+    // Steering bar
+    const midX = 14 + (w - 28) * 0.55;
+    const steerLen = steer * 40;
+    ctx.fillStyle = steer >= 0 ? "#45d0df" : "#ffaa1a";
+    ctx.fillRect(midX, barY + 4, steerLen, 12);
+
+    ctx.fillStyle = "#e6f8fa";
     ctx.fillText(
-      `AZ: ${f.azimuthDeg.toFixed(1)}° | DIST: ${f.distance.toFixed(1)}m | ${loomTxt}`,
-      16,
-      barY + 16,
+      `STEER: ${steer > 0 ? "+" : ""}${steer.toFixed(2)}`,
+      midX + 50,
+      barY + 14,
     );
-
-    // Row 2: Motor Decoding
-    const steerTxt = `VX: ${m.vx > 0 ? "+" : ""}${m.vx.toFixed(2)} m/s`;
-    const thrustTxt = `VZ: ${m.vz > 0 ? "+" : ""}${m.vz.toFixed(2)} m/s`;
-    const stateTxt = `STATE: ${m.flightState} | AROUSAL: ${(m.arousal * 100).toFixed(0)}%`;
-    ctx.fillStyle = m.swingTriggered ? "#ff5e7e" : "#61e89b";
-    ctx.fillText(`${steerTxt} | ${thrustTxt} | ${stateTxt}`, 16, barY + 34);
-
-    if (m.swingTriggered) {
-      ctx.fillStyle = "#ff5e7e";
-      ctx.font = "bold 9px monospace";
-      ctx.fillText(
-        `⚡ STRIKE: ${m.swingType.toUpperCase()} (${(m.swingPower * 100).toFixed(0)}%)`,
-        16,
-        barY + 49,
-      );
-    }
   }
 
   private drawTooltip(item: NeuronTelemetryItem, w: number, h: number) {
     const ctx = this.ctx;
-    const pos =
-      this.viewMode === "spatial"
-        ? this.getSpatialScreenPos(item.index, w, h)
-        : this.getNeuronScreenPos(item.index);
+    const neuron = this.graph?.neurons[item.index];
+    if (!neuron) return;
 
-    const boxW = 215;
-    const boxH = 106;
-    const tx = Math.min(w - (boxW + 10), Math.max(10, pos.x + 10));
-    const ty = Math.min(h - (boxH + 10), Math.max(10, pos.y - 30));
+    const tipW = 210;
+    const tipH = 92;
+    const tipX = Math.min(w - tipW - 10, Math.max(10, 16));
+    const tipY = 16;
 
-    ctx.fillStyle = "rgba(6, 14, 18, 0.96)";
-    ctx.fillRect(tx, ty, boxW, boxH);
-    ctx.strokeStyle = "#45d0df";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(tx, ty, boxW, boxH);
+    ctx.save();
+    ctx.fillStyle = "rgba(8, 16, 24, 0.94)";
+    ctx.strokeStyle = REGION_HEX[neuron.region] || "#45d0df";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(tipX, tipY, tipW, tipH, 6);
+    ctx.fill();
+    ctx.stroke();
 
-    ctx.fillStyle = "#45d0df";
-    ctx.font = "bold 10px monospace";
-    ctx.fillText(`MaleCNS v1.0 [ID: ${item.bodyId}]`, tx + 8, ty + 14);
+    ctx.fillStyle = REGION_HEX[neuron.region] || "#45d0df";
+    ctx.font = "bold 11px system-ui, sans-serif";
+    ctx.fillText(`${neuron.type} · #${neuron.bodyId}`, tipX + 10, tipY + 18);
 
-    ctx.font = "9px monospace";
-    ctx.fillStyle = "#ffffff";
-    const instStr = item.instance ? ` (${item.instance})` : "";
+    ctx.fillStyle = "#8caab5";
+    ctx.font = "10px monospace";
+    ctx.fillText(`Region: ${neuron.region}`, tipX + 10, tipY + 34);
     ctx.fillText(
-      `Type: ${item.type}${instStr}`.substring(0, 32),
-      tx + 8,
-      ty + 28,
+      `Transmitter: ${neuron.neurotransmitter || "unknown"}`,
+      tipX + 10,
+      tipY + 48,
     );
-
-    ctx.fillStyle = "#8ba3a8";
+    ctx.fillText(`Voltage Vm: ${item.v.toFixed(1)} mV`, tipX + 10, tipY + 62);
     ctx.fillText(
-      `Region: ${item.region} | Hemi: ${item.hemisphere || "unknown"}`,
-      tx + 8,
-      ty + 42,
+      `Rate: ${item.firingRateHz.toFixed(1)} Hz ${item.spiking ? "⚡ SPIKE" : ""}`,
+      tipX + 10,
+      tipY + 76,
     );
-    ctx.fillText(
-      `Transmitter: ${item.neurotransmitter || "unclear"}`,
-      tx + 8,
-      ty + 56,
-    );
-
-    const coordStr =
-      item.coordinateType === "soma_voxel"
-        ? "EM voxel soma (MaleCNS v1.0)"
-        : "Coord: derived/fallback";
-    ctx.fillText(coordStr, tx + 8, ty + 70);
-
-    ctx.fillText(
-      `Vm: ${item.v.toFixed(1)} mV | Rate: ${item.firingRateHz.toFixed(1)} Hz`,
-      tx + 8,
-      ty + 84,
-    );
-
-    ctx.fillStyle = item.spiking ? "#61e89b" : "#45d0df";
-    ctx.fillText(
-      `Spike: ${item.spiking ? "ACTIVE" : "RESTING"} | CLICK TO INSPECT`,
-      tx + 8,
-      ty + 98,
-    );
+    ctx.restore();
   }
 
-  private getNeuronScreenPos(idx: number): { x: number; y: number } {
-    if (!this.graph) return { x: 0, y: 0 };
-    const n = this.graph.neurons[idx];
-    const w = this.width;
-
-    let baseY = 58;
-    if (n.region === "Protocerebrum") baseY = 138;
-    else if (n.region === "CentralComplex") baseY = 208;
-    else if (n.region === "Descending") baseY = 278;
-    else if (n.region === "VNC") baseY = 352;
-
-    const nx = n.pos ? n.pos[0] : 0;
-    const x = w * 0.5 + nx * (w * 0.42);
-    const ny = n.pos ? n.pos[1] : 0;
-    const y = baseY + ny * 16;
-
-    return { x: Math.max(18, Math.min(w - 18, x)), y: Math.max(25, y) };
-  }
-
-  private getSpatialScreenPos(
-    idx: number,
-    w: number,
-    h: number,
-  ): { x: number; y: number } {
-    if (!this.graph) return { x: 0, y: 0 };
-    const n = this.graph.neurons[idx];
-    const cx = w * 0.5;
-    const cy = h * 0.46;
-    const scale = Math.min(w, h) * 0.42;
-
-    const nx = n.pos ? n.pos[0] : 0;
-    const ny = n.pos ? n.pos[1] : 0;
-    const nz = n.pos ? n.pos[2] : 0;
-
-    // Apply Y-axis rotation
-    const cosR = Math.cos(this.rotY);
-    const sinR = Math.sin(this.rotY);
-    const rx = nx * cosR - nz * sinR;
-    const rz = nx * sinR + nz * cosR;
-
-    const x = cx + rx * scale;
-    const y = cy + (ny * 0.85 - rz * 0.4) * scale;
-    return { x, y };
+  destroy() {
+    this.threeRenderer.dispose();
+    if (this.lineMesh) {
+      this.lineMesh.geometry.dispose();
+    }
+    if (this.shaderMaterial) {
+      this.shaderMaterial.dispose();
+    }
   }
 }

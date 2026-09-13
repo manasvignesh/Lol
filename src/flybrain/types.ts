@@ -286,6 +286,9 @@ export interface FlyContactDiagnostic {
   prepareTime: number;
   strikeTime: number;
   predictedContactTime: number;
+  predictedContactTimeAtPrepare?: number;
+  actualStrikeTimingError?: number;
+  predictionErrorAtPrepare?: number;
   closestDistance: number;
   closestTime: number;
   racketAtClosest: [number, number, number];
@@ -297,4 +300,59 @@ export interface FlyContactDiagnostic {
   neuralReadiness: number;
   mode: "scientific" | "demo-assist";
   timingErrorMs?: number;
+}
+
+export interface NeuronMorphologyMeta {
+  index: number;
+  bodyId: string;
+  hasMorphology: boolean;
+  nodeCount: number;
+  segmentCount: number;
+  region: NeuropilRegion | string;
+  type: string;
+  instance?: string | null;
+  hemisphere?: "L" | "R" | "bilateral" | "unknown" | null;
+  neurotransmitter?: Neurotransmitter | string | null;
+  centroid: [number, number, number];
+  bounds: {
+    min: [number, number, number];
+    max: [number, number, number];
+  };
+}
+
+export interface MorphologyTransform {
+  center: [number, number, number];
+  scaleFactor: number;
+  scaleBar100umUnits: number;
+  boundsMin: [number, number, number];
+  boundsMax: [number, number, number];
+}
+
+export interface MorphologyManifest {
+  dataset: string;
+  datasetName: string;
+  datasetVersion: string;
+  provenance: string;
+  neuronCount: number;
+  morphologyNeurons: number;
+  missingMorphologyCount: number;
+  totalRawNodes: number;
+  totalSegments: number;
+  rawVoxelSizeNm: [number, number, number];
+  coordinateUnits: string;
+  transform: MorphologyTransform;
+  files: {
+    [filename: string]: {
+      sha256: string;
+      byteLength: number;
+    };
+  };
+}
+
+export interface MorphologyData {
+  manifest: MorphologyManifest;
+  meta: NeuronMorphologyMeta[];
+  positions: Float32Array; // [x1, y1, z1, x2, y2, z2, ...] flat array of line segment coordinates
+  segmentBodyIds: Uint16Array; // Neuron index (0..N-1) per segment
+  neuronOffsets: Uint32Array; // Start segment index for each neuron [0..N], length N+1
 }

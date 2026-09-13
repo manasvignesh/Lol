@@ -10,6 +10,11 @@ for (const path of [
   "public/data/connectome/indices.bin",
   "public/data/connectome/weights.bin",
   "public/data/connectome/signs.bin",
+  "public/data/morphology/morphology-manifest.json",
+  "public/data/morphology/morphologyMeta.json",
+  "public/data/morphology/segmentPositions.bin",
+  "public/data/morphology/segmentBodyIds.bin",
+  "public/data/morphology/neuronOffsets.bin",
 ]) {
   try {
     await access(path);

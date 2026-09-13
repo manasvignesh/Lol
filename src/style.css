@@ -426,9 +426,10 @@ label.check {
 }
 #pause {
   position: fixed;
-  right: 4%;
-  top: 100px;
+  left: 4%;
+  top: 135px;
   font-size: 11px;
+  z-index: 12;
 }
 #rally-hint {
   position: fixed;
@@ -815,6 +816,30 @@ label.check {
 #court-container.split-view .vignette {
   right: 440px;
   width: calc(100vw - 440px);
+}
+#court-container.microscope-active #court {
+  right: 75vw;
+  width: 25vw;
+}
+#court-container.microscope-active .vignette {
+  right: 75vw;
+  width: 25vw;
+}
+
+#brain-panel.microscope-mode {
+  width: 75vw;
+  max-width: 1400px;
+}
+
+.sim-btn.microscope-btn {
+  background: rgba(69, 208, 223, 0.15);
+  border: 1px solid rgba(69, 208, 223, 0.5);
+  color: #45d0df;
+  font-weight: 700;
+}
+.sim-btn.microscope-btn.active {
+  background: #45d0df;
+  color: #081216;
 }
 
 /* Header Enhancements */

@@ -1,11 +1,15 @@
 import type {
   ConnectomeCSRGraph,
   ConnectomeManifest,
+  MorphologyData,
+  MorphologyManifest,
   NeuronData,
+  NeuronMorphologyMeta,
 } from "./types";
 
 export class ConnectomeLoader {
   private static cachedGraph: ConnectomeCSRGraph | null = null;
+  private static cachedMorphology: MorphologyData | null = null;
 
   /**
    * Synchronous load for Node.js / test environments.
@@ -229,7 +233,193 @@ export class ConnectomeLoader {
     }
   }
 
+  /**
+   * Synchronous morphology load for Node.js / test environments.
+   */
+  static loadMorphologySync(baseDir?: string): MorphologyData {
+    if (this.cachedMorphology) {
+      return this.cachedMorphology;
+    }
+
+    if (
+      typeof process === "undefined" ||
+      !process.versions ||
+      !process.versions.node
+    ) {
+      throw new Error(
+        "ConnectomeLoader.loadMorphologySync is only available in Node.js",
+      );
+    }
+
+    let fs: any;
+    let path: any;
+    try {
+      if (typeof (process as any).getBuiltinModule === "function") {
+        fs = (process as any).getBuiltinModule("node:fs");
+        path = (process as any).getBuiltinModule("node:path");
+      }
+    } catch {
+      // ignore
+    }
+
+    if (!fs || !path) {
+      throw new Error(
+        "ConnectomeLoader.loadMorphologySync requires Node.js built-in modules",
+      );
+    }
+
+    const resolvedDir =
+      baseDir || path.resolve(process.cwd(), "public", "data", "morphology");
+
+    const manifest: MorphologyManifest = JSON.parse(
+      fs.readFileSync(
+        path.join(resolvedDir, "morphology-manifest.json"),
+        "utf8",
+      ),
+    );
+    const meta: NeuronMorphologyMeta[] = JSON.parse(
+      fs.readFileSync(path.join(resolvedDir, "morphologyMeta.json"), "utf8"),
+    );
+
+    const toAB = (b: any): ArrayBuffer =>
+      new Uint8Array(b).buffer as ArrayBuffer;
+
+    const posBuf = toAB(
+      fs.readFileSync(path.join(resolvedDir, "segmentPositions.bin")),
+    );
+    const bodyBuf = toAB(
+      fs.readFileSync(path.join(resolvedDir, "segmentBodyIds.bin")),
+    );
+    const offsetBuf = toAB(
+      fs.readFileSync(path.join(resolvedDir, "neuronOffsets.bin")),
+    );
+
+    const positions = new Float32Array(posBuf);
+    const segmentBodyIds = new Uint16Array(bodyBuf);
+    const neuronOffsets = new Uint32Array(offsetBuf);
+
+    const morphologyData: MorphologyData = {
+      manifest,
+      meta,
+      positions,
+      segmentBodyIds,
+      neuronOffsets,
+    };
+
+    this.cachedMorphology = morphologyData;
+    return morphologyData;
+  }
+
+  /**
+   * Asynchronous morphology load for Browser / Node.js.
+   */
+  static async loadMorphology(
+    baseUrl: string = "/data/morphology",
+  ): Promise<MorphologyData> {
+    if (this.cachedMorphology) {
+      return this.cachedMorphology;
+    }
+
+    // Node.js environment
+    if (
+      typeof process !== "undefined" &&
+      process.versions &&
+      process.versions.node &&
+      typeof window === "undefined"
+    ) {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const resolvedDir = path.resolve(
+        process.cwd(),
+        "public",
+        "data",
+        "morphology",
+      );
+
+      const manifest: MorphologyManifest = JSON.parse(
+        fs.readFileSync(
+          path.join(resolvedDir, "morphology-manifest.json"),
+          "utf8",
+        ),
+      );
+      const meta: NeuronMorphologyMeta[] = JSON.parse(
+        fs.readFileSync(path.join(resolvedDir, "morphologyMeta.json"), "utf8"),
+      );
+
+      const toAB = (b: any): ArrayBuffer =>
+        new Uint8Array(b).buffer as ArrayBuffer;
+
+      const posBuf = toAB(
+        fs.readFileSync(path.join(resolvedDir, "segmentPositions.bin")),
+      );
+      const bodyBuf = toAB(
+        fs.readFileSync(path.join(resolvedDir, "segmentBodyIds.bin")),
+      );
+      const offsetBuf = toAB(
+        fs.readFileSync(path.join(resolvedDir, "neuronOffsets.bin")),
+      );
+
+      const positions = new Float32Array(posBuf);
+      const segmentBodyIds = new Uint16Array(bodyBuf);
+      const neuronOffsets = new Uint32Array(offsetBuf);
+
+      const morphologyData: MorphologyData = {
+        manifest,
+        meta,
+        positions,
+        segmentBodyIds,
+        neuronOffsets,
+      };
+
+      this.cachedMorphology = morphologyData;
+      return morphologyData;
+    }
+
+    try {
+      // Browser environment with fetch
+      const [manifestRes, metaRes, posRes, bodyRes, offsetRes] =
+        await Promise.all([
+          fetch(`${baseUrl}/morphology-manifest.json`),
+          fetch(`${baseUrl}/morphologyMeta.json`),
+          fetch(`${baseUrl}/segmentPositions.bin`),
+          fetch(`${baseUrl}/segmentBodyIds.bin`),
+          fetch(`${baseUrl}/neuronOffsets.bin`),
+        ]);
+
+      if (!manifestRes.ok || !metaRes.ok) {
+        throw new Error(
+          `Failed to fetch morphology metadata: ${manifestRes.statusText}`,
+        );
+      }
+
+      const manifest: MorphologyManifest = await manifestRes.json();
+      const meta: NeuronMorphologyMeta[] = await metaRes.json();
+      const posBuf = await posRes.arrayBuffer();
+      const bodyBuf = await bodyRes.arrayBuffer();
+      const offsetBuf = await offsetRes.arrayBuffer();
+
+      const positions = new Float32Array(posBuf);
+      const segmentBodyIds = new Uint16Array(bodyBuf);
+      const neuronOffsets = new Uint32Array(offsetBuf);
+
+      const morphologyData: MorphologyData = {
+        manifest,
+        meta,
+        positions,
+        segmentBodyIds,
+        neuronOffsets,
+      };
+
+      this.cachedMorphology = morphologyData;
+      return morphologyData;
+    } catch (err) {
+      console.warn("ConnectomeLoader morphology error:", err);
+      throw err;
+    }
+  }
+
   static clearCache() {
     this.cachedGraph = null;
+    this.cachedMorphology = null;
   }
 }

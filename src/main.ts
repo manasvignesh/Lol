@@ -14,6 +14,7 @@ import {
 import { AudioManager } from "./audio";
 import { DebugInput, syntheticPose } from "./synthetic";
 import { BrainRenderer } from "./flybrain/brainRenderer";
+import { ConnectomeLoader } from "./flybrain/connectomeLoader";
 import type { LiveEventEntry, NeuronDetailData } from "./flybrain/types";
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
@@ -178,14 +179,17 @@ $("#app").innerHTML = `
 
   <div class="brain-toolbar">
     <div class="brain-view-tabs">
-      <button id="btn-view-circuit" class="active">Circuit View</button>
-      <button id="btn-view-spatial">Connectome</button>
-      <button id="btn-view-raster">Spike View</button>
+      <button id="btn-view-spatial" class="active" title="Real MaleCNS Drosophila 3D Skeletons">3D Skeletons</button>
+      <button id="btn-view-circuit" title="Functional Circuit Flow">Circuit</button>
+      <button id="btn-view-raster" title="LIF Spike Timeline">Spikes</button>
     </div>
     <div class="sim-step-controls">
+      <button id="btn-brain-color-mode" class="sim-btn" title="Toggle Activity / Anatomy Region Colors">🎨 Activity</button>
+      <button id="btn-brain-reset-cam" class="sim-btn" title="Reset 3D Camera">↺ 3D</button>
       <button id="btn-pause-brain" class="sim-btn" title="Pause / Resume Neural Simulation">⏸ Pause</button>
       <button id="btn-step-2ms" class="sim-btn step-btn" title="Advance Simulation by 2ms (1 LIF step)">+2ms</button>
       <button id="btn-step-10ms" class="sim-btn step-btn" title="Advance Simulation by 10ms (5 LIF steps)">+10ms</button>
+      <button id="btn-toggle-microscope" class="sim-btn microscope-btn" title="Expand Microscope Mode">🔬 Lab</button>
     </div>
   </div>
 
@@ -393,6 +397,15 @@ try {
     const g = game.fly.bridge.getConnectomeGraph();
     if (g) {
       if (brainRenderer) brainRenderer.setGraph(g);
+
+      // Load genuine MaleCNS 3D morphology
+      void ConnectomeLoader.loadMorphology("/data/morphology").then((morph) => {
+        if (brainRenderer) {
+          brainRenderer.setMorphology(morph);
+          brainRenderer.setViewMode("morphology");
+        }
+      });
+
       const isReal = g.manifest.provenance === "malecns-real";
       const edgeCount = g.manifest.edgeCount;
       const bioSynapses = g.manifest.biologicalSynapseTotal ?? edgeCount;
@@ -678,19 +691,19 @@ $("#btn-toggle-brain").addEventListener("click", () => toggleBrainPanel());
 $("#btn-brain-close").addEventListener("click", () => toggleBrainPanel(false));
 
 // View tabs
+$("#btn-view-spatial").addEventListener("click", () => {
+  brainRenderer?.setViewMode("morphology");
+  document
+    .querySelectorAll(".brain-view-tabs button")
+    .forEach((b) => b.classList.remove("active"));
+  $("#btn-view-spatial").classList.add("active");
+});
 $("#btn-view-circuit").addEventListener("click", () => {
   brainRenderer?.setViewMode("circuit");
   document
     .querySelectorAll(".brain-view-tabs button")
     .forEach((b) => b.classList.remove("active"));
   $("#btn-view-circuit").classList.add("active");
-});
-$("#btn-view-spatial").addEventListener("click", () => {
-  brainRenderer?.setViewMode("spatial");
-  document
-    .querySelectorAll(".brain-view-tabs button")
-    .forEach((b) => b.classList.remove("active"));
-  $("#btn-view-spatial").classList.add("active");
 });
 $("#btn-view-raster").addEventListener("click", () => {
   brainRenderer?.setViewMode("raster");
@@ -699,6 +712,36 @@ $("#btn-view-raster").addEventListener("click", () => {
     .forEach((b) => b.classList.remove("active"));
   $("#btn-view-raster").classList.add("active");
 });
+
+// Color Mode & Reset Controls
+$("#btn-brain-color-mode").addEventListener("click", () => {
+  if (!brainRenderer) return;
+  const curr = brainRenderer.getColorMode();
+  const next = curr === "activity" ? "anatomy" : "activity";
+  brainRenderer.setColorMode(next);
+  $("#btn-brain-color-mode").textContent =
+    next === "activity" ? "🎨 Activity" : "🧬 Anatomy";
+  toast(`Connectome coloring: ${next.toUpperCase()}`);
+});
+
+$("#btn-brain-reset-cam").addEventListener("click", () => {
+  brainRenderer?.resetCamera();
+  toast("3D Camera Reset");
+});
+
+let microscopeMode = false;
+function toggleMicroscopeMode(active?: boolean) {
+  microscopeMode = active !== undefined ? active : !microscopeMode;
+  $("#court-container").classList.toggle("microscope-active", microscopeMode);
+  $("#brain-panel").classList.toggle("microscope-mode", microscopeMode);
+  $("#btn-toggle-microscope").classList.toggle("active", microscopeMode);
+  brainRenderer?.setMicroscopeMode(microscopeMode);
+  toast(microscopeMode ? "Microscope Lab View Active" : "Standard View Active");
+}
+
+$("#btn-toggle-microscope").addEventListener("click", () =>
+  toggleMicroscopeMode(),
+);
 
 // Simulation Pause / Step controls
 $("#btn-pause-brain").addEventListener("click", () => {

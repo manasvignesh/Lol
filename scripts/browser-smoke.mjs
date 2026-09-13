@@ -33,7 +33,6 @@ await page.locator("#settings-done").click();
 if (await page.locator("#pause-screen").isHidden())
   throw new Error("Settings did not return to paused match");
 await page.locator("#back-home").click();
-await page.locator("#settings-open").click();
 await page.locator("#synthetic").click();
 await page.waitForFunction(() => window.motionDiagnostics.contacts > 0);
 const synthetic = await page.evaluate(() => window.motionDiagnostics);
