@@ -249,6 +249,7 @@ export class NeuralEngine {
       bioSignals,
       features,
       dt * 0.001,
+      sensoryInput,
     );
     this.lastMotorCommand = motorCommand;
 

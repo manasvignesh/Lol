@@ -100,22 +100,37 @@ export class FlyOpponent {
     // Update heading based on steer torque
     this.heading = clamp(motor.steerTorque * 0.25, -0.4, 0.4);
 
-    // Update fly racket position based on strike state
-    const isStriking =
-      this.swingActiveTime > 0 || motor.flightState === "STRIKE";
-    const isBackhand = motor.swingType === "backhand" || this.x > shuttle.p.x;
-    const targetRacketX = this.x + (isBackhand ? -0.45 : 0.45);
-    const targetRacketY = isStriking ? this.y + 0.35 : this.y - 0.15;
-    const targetRacketZ = this.z + (isStriking ? 0.65 : 0.3);
+    // Update fly racket position and rotation from EmbodimentAdapter
+    if (motor.targetRacketPos) {
+      this.racketPos = v(
+        motor.targetRacketPos[0],
+        motor.targetRacketPos[1],
+        motor.targetRacketPos[2],
+      );
+      this.racketRotationZ = motor.racketRotationZ ?? 0.4;
+    } else {
+      const isStriking =
+        this.swingActiveTime > 0 || motor.flightState === "STRIKE";
+      const isBackhand = motor.swingType === "backhand" || this.x > shuttle.p.x;
+      const targetRacketX = this.x + (isBackhand ? -0.45 : 0.45);
+      const targetRacketY = isStriking ? this.y + 0.35 : this.y - 0.15;
+      const targetRacketZ = this.z + (isStriking ? 0.65 : 0.3);
 
-    const lerpSpeed = isStriking ? 32 : 16;
-    this.racketPos.x +=
-      (targetRacketX - this.racketPos.x) * Math.min(1.0, dt * lerpSpeed);
-    this.racketPos.y +=
-      (targetRacketY - this.racketPos.y) * Math.min(1.0, dt * lerpSpeed);
-    this.racketPos.z +=
-      (targetRacketZ - this.racketPos.z) * Math.min(1.0, dt * lerpSpeed);
-    this.racketRotationZ = isStriking ? (isBackhand ? 0.95 : -0.95) : 0.4;
+      const lerpSpeed = isStriking ? 32 : 16;
+      this.racketPos.x +=
+        (targetRacketX - this.racketPos.x) * Math.min(1.0, dt * lerpSpeed);
+      this.racketPos.y +=
+        (targetRacketY - this.racketPos.y) * Math.min(1.0, dt * lerpSpeed);
+      this.racketPos.z +=
+        (targetRacketZ - this.racketPos.z) * Math.min(1.0, dt * lerpSpeed);
+      this.racketRotationZ = isStriking ? (isBackhand ? 0.95 : -0.95) : 0.4;
+    }
+
+    if (motor.racketState === "STRIKE" || motor.swingTriggered) {
+      this.swingActiveTime = 0.26;
+    } else {
+      this.swingActiveTime = Math.max(0, this.swingActiveTime - dt);
+    }
 
     return motor;
   }

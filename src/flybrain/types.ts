@@ -149,6 +149,13 @@ export interface FlySensoryFeatures {
   incomingTrajectoryThreat: number; // 0 to 1
 }
 
+export type EmbodimentRacketState =
+  | "IDLE"
+  | "TRACKING"
+  | "PREPARE"
+  | "STRIKE"
+  | "RECOVER";
+
 export interface FlyMotorCommand {
   // Pure biological decoding
   biological?: BiologicalMotorSignals;
@@ -161,6 +168,14 @@ export interface FlyMotorCommand {
   swingPower: number; // 0.0 to 1.0
   arousal: number; // 0.0 to 1.0 (wing buzzing / readiness)
   flightState: "HOVER" | "PURSUIT" | "STRIKE" | "RECOVER";
+  // Engineered racket effector state & procedural stroke variables
+  racketState?: EmbodimentRacketState;
+  targetRacketPos?: [number, number, number];
+  targetRacketVel?: [number, number, number];
+  racketRotationZ?: number;
+  timeToContact?: number;
+  estimatedContactPoint?: [number, number, number];
+  strokeProgress?: number;
 }
 
 export interface NeuronTelemetryItem {
@@ -251,4 +266,35 @@ export interface LiveEventEntry {
   icon: string;
   title: string;
   detail: string;
+}
+
+export type FlyMissReason =
+  | "BODY MISS"
+  | "RACKET MISS"
+  | "LATE STRIKE"
+  | "EARLY STRIKE"
+  | "VERTICAL MISS"
+  | "LATERAL MISS"
+  | "NEURAL MISS"
+  | "PATHWAY SILENCED";
+
+export interface FlyContactDiagnostic {
+  shotId: number;
+  scenario: string;
+  visualOnsetTime: number;
+  motorOnsetTime: number;
+  prepareTime: number;
+  strikeTime: number;
+  predictedContactTime: number;
+  closestDistance: number;
+  closestTime: number;
+  racketAtClosest: [number, number, number];
+  shuttleAtClosest: [number, number, number];
+  flyAtClosest: [number, number, number];
+  result: "HIT" | "MISS";
+  missReason?: FlyMissReason;
+  racketStateAtClosest: EmbodimentRacketState;
+  neuralReadiness: number;
+  mode: "scientific" | "demo-assist";
+  timingErrorMs?: number;
 }

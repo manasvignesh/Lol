@@ -11,6 +11,7 @@ import {
 } from "./physics";
 import { neutralMotion, type Motion, type Intent } from "./motion";
 import { FlyOpponent } from "./flybrain/flyOpponent";
+import type { FlyContactDiagnostic, FlyMissReason } from "./flybrain/types";
 
 export type GameEvent = {
   type: "hit" | "point" | "net" | "serve" | "swing";
@@ -340,28 +341,98 @@ export class Game {
 
     // --- Opponent Return Logic ---
     if (this.settings.opponentType === "fruitfly") {
+      const flyMotor = this.fly.lastMotorCommand;
+      const rPos = this.fly.racketPos;
+      const prevRPos = this.fly.previousRacket;
+
+      // Track diagnostic telemetry during incoming shot
+      if (s.lastHit === 0) {
+        const dX = s.p.x - rPos.x;
+        const dY = s.p.y - rPos.y;
+        const dZ = s.p.z - rPos.z;
+        const instDist = Math.sqrt(dX * dX + dY * dY + dZ * dZ);
+
+        if (
+          this.currentShotDiagnostic &&
+          instDist < this.currentShotDiagnostic.closestDistance
+        ) {
+          this.currentShotDiagnostic.closestDistance = instDist;
+          this.currentShotDiagnostic.closestTime = this.time;
+          this.currentShotDiagnostic.racketAtClosest = [rPos.x, rPos.y, rPos.z];
+          this.currentShotDiagnostic.shuttleAtClosest = [s.p.x, s.p.y, s.p.z];
+          this.currentShotDiagnostic.flyAtClosest = [
+            this.fly.x,
+            this.fly.y,
+            this.fly.z,
+          ];
+          this.currentShotDiagnostic.racketStateAtClosest =
+            flyMotor?.racketState ?? "IDLE";
+          this.currentShotDiagnostic.neuralReadiness = flyMotor?.arousal ?? 0.2;
+        }
+
+        if (this.currentShotDiagnostic) {
+          if (
+            flyMotor?.arousal &&
+            flyMotor.arousal > 0.25 &&
+            this.currentShotDiagnostic.motorOnsetTime === 0
+          ) {
+            this.currentShotDiagnostic.motorOnsetTime = this.time;
+          }
+          if (
+            flyMotor?.racketState === "PREPARE" &&
+            this.currentShotDiagnostic.prepareTime === 0
+          ) {
+            this.currentShotDiagnostic.prepareTime = this.time;
+          }
+          if (
+            (flyMotor?.racketState === "STRIKE" || flyMotor?.swingTriggered) &&
+            this.currentShotDiagnostic.strikeTime === 0
+          ) {
+            this.currentShotDiagnostic.strikeTime = this.time;
+          }
+          if (flyMotor?.timeToContact) {
+            this.currentShotDiagnostic.predictedContactTime =
+              this.time + flyMotor.timeToContact;
+          }
+        }
+      }
+
       if (
         s.lastHit === 0 &&
-        s.p.z < -0.4 &&
-        s.p.y < 3.2 &&
-        s.p.y > 0.25 &&
+        s.p.z < -0.2 &&
+        s.p.y < 3.4 &&
+        s.p.y > 0.2 &&
         !this.fly.swingAttempted
       ) {
-        // Physical swept collision between cyber-racket and shuttle path
-        const racketContact = sweptDistance(
-          this.fly.previousRacket,
-          this.fly.racketPos,
-          s.prev,
-          s.p,
-        );
+        // Physical continuous swept distance between racket trajectory and shuttle trajectory
+        const racketContact = sweptDistance(prevRPos, rPos, s.prev, s.p);
 
-        // Fly must have an active neural strike stroke AND physical blade contact
+        // Fly must have an active strike stroke or preparatory swing state AND physical blade contact
         const isSwinging =
-          (flyMotor && flyMotor.swingTriggered) || this.fly.swingActiveTime > 0;
-        const racketBladeRadius = 0.65; // Physical racket contact radius
+          (flyMotor &&
+            (flyMotor.swingTriggered ||
+              flyMotor.racketState === "STRIKE" ||
+              flyMotor.flightState === "STRIKE")) ||
+          this.fly.swingActiveTime > 0;
+
+        const racketBladeRadius =
+          this.settings.flyEmbodimentMode === "scientific" ? 0.65 : 0.82;
 
         if (isSwinging && racketContact.distance < racketBladeRadius) {
           this.fly.swingAttempted = true;
+
+          if (this.currentShotDiagnostic) {
+            this.currentShotDiagnostic.result = "HIT";
+            this.currentShotDiagnostic.closestDistance = Math.min(
+              this.currentShotDiagnostic.closestDistance,
+              racketContact.distance,
+            );
+            this.diagnosticHistory.push({ ...this.currentShotDiagnostic });
+            if (this.diagnosticHistory.length > 50) {
+              this.diagnosticHistory.shift();
+            }
+          }
+
           const hitIntent: Intent =
             flyMotor?.swingType === "overhead"
               ? "smash"
@@ -420,6 +491,31 @@ export class Game {
         1,
       );
       this.fly.swingAttempted = false;
+
+      // Start new diagnostic tracker for incoming shot toward fly
+      this.shotCount++;
+      this.currentShotDiagnostic = {
+        shotId: this.shotCount,
+        scenario: intent === "serve" ? "SERVE" : intent.toUpperCase(),
+        visualOnsetTime: 0,
+        motorOnsetTime: 0,
+        prepareTime: 0,
+        strikeTime: 0,
+        predictedContactTime: 0,
+        closestDistance: 999,
+        closestTime: 0,
+        racketAtClosest: [
+          this.fly.racketPos.x,
+          this.fly.racketPos.y,
+          this.fly.racketPos.z,
+        ],
+        shuttleAtClosest: [s.p.x, s.p.y, s.p.z],
+        flyAtClosest: [this.fly.x, this.fly.y, this.fly.z],
+        result: "MISS",
+        racketStateAtClosest: "IDLE",
+        neuralReadiness: this.fly.lastMotorCommand?.arousal ?? 0.2,
+        mode: this.settings.flyEmbodimentMode,
+      };
     } else if (this.settings.opponentType === "fruitfly") {
       // Engineered Embodiment: Outgoing direction derived from physical racket contact point,
       // steering torque, and neural descending power without Classic AI heuristics
@@ -497,11 +593,14 @@ export class Game {
     }
   }
 
-  lastMissReason = "";
+  shotCount = 0;
+  currentShotDiagnostic: FlyContactDiagnostic | null = null;
+  diagnosticHistory: FlyContactDiagnostic[] = [];
+  lastMissReason: FlyMissReason | string = "";
   lastContactMoment: { time: number; power: number; type: string } | null =
     null;
 
-  diagnoseFlyMiss(): string {
+  diagnoseFlyMiss(): FlyMissReason {
     const s = this.shuttle;
     const bridge = this.fly.bridge;
     const engine = bridge.getEngine();
@@ -509,49 +608,64 @@ export class Game {
 
     if (
       interventions?.isTypeSilenced("LC4") ||
-      interventions?.isTypeSilenced("LC6")
-    ) {
-      return "PATHWAY SILENCED (LC4/6 Looming)";
-    }
-    if (
+      interventions?.isTypeSilenced("LC6") ||
       interventions?.isTypeSilenced("DNa02") ||
-      interventions?.isTypeSilenced("DNa01")
-    ) {
-      return "PATHWAY SILENCED (DNa02 Steering)";
-    }
-    if (
+      interventions?.isTypeSilenced("DNa01") ||
       interventions?.isTypeSilenced("DNb01") ||
       interventions?.isTypeSilenced("DNp01")
     ) {
-      return "PATHWAY SILENCED (DNb01 Strike Trigger)";
+      return "PATHWAY SILENCED";
     }
 
     const latOffset = Math.abs(s.p.x - this.fly.x);
-    if (latOffset > 1.2) {
-      return `STEERING ERROR (Offset: ${latOffset.toFixed(2)}m)`;
+    if (latOffset > 1.25) {
+      return "BODY MISS";
     }
 
+    const diag = this.currentShotDiagnostic;
     const flyMotor = this.fly.lastMotorCommand;
-    if (flyMotor.arousal < 0.25) {
-      return "INSUFFICIENT MOTOR ACTIVATION";
+
+    if (diag && diag.visualOnsetTime === 0 && flyMotor.arousal < 0.18) {
+      return "NEURAL MISS";
     }
 
-    if (this.fly.swingActiveTime > 0) {
-      return "RACKET MISSED CONTACT";
+    if (diag && diag.strikeTime > 0) {
+      if (diag.strikeTime > diag.closestTime + 0.05) {
+        return "LATE STRIKE";
+      }
+      if (diag.strikeTime + 0.28 < diag.closestTime - 0.05) {
+        return "EARLY STRIKE";
+      }
     }
 
-    return "LATE MOTOR RESPONSE";
+    if (diag) {
+      const vertDist = Math.abs(
+        diag.racketAtClosest[1] - diag.shuttleAtClosest[1],
+      );
+      if (vertDist > 0.8) {
+        return "VERTICAL MISS";
+      }
+      const latDist = Math.abs(
+        diag.racketAtClosest[0] - diag.shuttleAtClosest[0],
+      );
+      if (latDist > 0.9) {
+        return "LATERAL MISS";
+      }
+    }
+
+    return "RACKET MISS";
   }
 
   feedSyntheticShot(
     scenario: "left" | "right" | "center" | "high" | "fast" | "drop",
   ) {
     this.ready();
-    const startPos = v(0, 1.2, 3.8);
+    const startPos = scenario === "fast" ? v(0, 2.4, 3.8) : v(0, 1.2, 3.8);
     this.playerPos = v(0, 0, C.playerBase.z);
     this.racket = v(0.3, 1.4, 3.4);
     this.shuttle.p = { ...startPos };
     this.shuttle.prev = { ...startPos };
+    this.fly.swingAttempted = false;
 
     let target = v(0, 0.05, -4.2);
     let intent: Intent = "clear";
@@ -596,12 +710,46 @@ export class Game {
       position: { ...this.shuttle.p },
       speed: len(this.shuttle.velocity) * 3.6,
     });
+
+    this.shotCount++;
+    this.currentShotDiagnostic = {
+      shotId: this.shotCount,
+      scenario: scenario.toUpperCase(),
+      visualOnsetTime: 0,
+      motorOnsetTime: 0,
+      prepareTime: 0,
+      strikeTime: 0,
+      predictedContactTime: 0,
+      closestDistance: 999,
+      closestTime: 0,
+      racketAtClosest: [
+        this.fly.racketPos.x,
+        this.fly.racketPos.y,
+        this.fly.racketPos.z,
+      ],
+      shuttleAtClosest: [this.shuttle.p.x, this.shuttle.p.y, this.shuttle.p.z],
+      flyAtClosest: [this.fly.x, this.fly.y, this.fly.z],
+      result: "MISS",
+      racketStateAtClosest: "IDLE",
+      neuralReadiness: this.fly.lastMotorCommand?.arousal ?? 0.2,
+      mode: this.settings.flyEmbodimentMode,
+    };
   }
 
   point(side: 0 | 1, reason: string) {
     if (side === 0 && this.settings.opponentType === "fruitfly") {
       this.lastMissReason = this.diagnoseFlyMiss();
       reason = `${reason} (${this.lastMissReason})`;
+
+      if (this.currentShotDiagnostic) {
+        this.currentShotDiagnostic.result = "MISS";
+        this.currentShotDiagnostic.missReason = this
+          .lastMissReason as FlyMissReason;
+        this.diagnosticHistory.push({ ...this.currentShotDiagnostic });
+        if (this.diagnosticHistory.length > 50) {
+          this.diagnosticHistory.shift();
+        }
+      }
     }
 
     this.match.point(side);

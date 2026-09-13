@@ -106,18 +106,18 @@ export class SensoryEncoder {
 
     // 1. LC10 (Small Target / Azimuth Tracking Visual Projection Neurons)
     // Excited when shuttle is within the visual field, with ipsilateral azimuth weighting
-    if (features.distance < 15.0) {
+    if (features.distance < 16.0) {
       const baseTrack = Math.min(
-        30.0,
-        (12.0 / Math.max(1.0, features.distance)) * 15.0,
+        40.0,
+        (14.0 / Math.max(0.8, features.distance)) * 18.0,
       );
 
       // Left hemisphere visual field tuning
       const leftWeight = Math.max(
         0.0,
-        Math.min(1.0, (20.0 - features.azimuthDeg) / 40.0),
+        Math.min(1.0, (25.0 - features.azimuthDeg) / 50.0),
       );
-      if (leftWeight > 0.1) {
+      if (leftWeight > 0.05) {
         for (const id of lc10Left) {
           currentBuffer[id] += baseTrack * leftWeight;
         }
@@ -126,37 +126,43 @@ export class SensoryEncoder {
       // Right hemisphere visual field tuning
       const rightWeight = Math.max(
         0.0,
-        Math.min(1.0, (features.azimuthDeg + 20.0) / 40.0),
+        Math.min(1.0, (features.azimuthDeg + 25.0) / 50.0),
       );
-      if (rightWeight > 0.1) {
+      if (rightWeight > 0.05) {
         for (const id of lc10Right) {
           currentBuffer[id] += baseTrack * rightWeight;
         }
       }
     }
 
-    // 2. LC4 & LC6 (Looming Collision & Expansion VPNs)
-    // Non-linear acceleration response to looming expansion rate eta(t)
-    if (features.isApproaching && features.loomingRate > 0.003) {
-      const loomingDrive = Math.min(55.0, features.loomingRate * 800.0);
+    // 2. LC4 & LC6 (Looming Collision & High-Speed Expansion VPNs)
+    // Non-linear acceleration response to looming expansion rate and fast closing speed
+    if (features.isApproaching) {
+      const speedBonus = Math.max(0, (features.relativeSpeed - 8.0) * 1.5);
+      const loomingDrive = Math.min(
+        75.0,
+        features.loomingRate * 900.0 + speedBonus,
+      );
 
-      if (features.azimuthDeg <= 15) {
-        for (const id of lc4Left) currentBuffer[id] += loomingDrive * 1.3;
-        for (const id of lc6Left) currentBuffer[id] += loomingDrive * 1.0;
-      }
-      if (features.azimuthDeg >= -15) {
-        for (const id of lc4Right) currentBuffer[id] += loomingDrive * 1.3;
-        for (const id of lc6Right) currentBuffer[id] += loomingDrive * 1.0;
+      if (loomingDrive > 1.0) {
+        if (features.azimuthDeg <= 20) {
+          for (const id of lc4Left) currentBuffer[id] += loomingDrive * 1.4;
+          for (const id of lc6Left) currentBuffer[id] += loomingDrive * 1.1;
+        }
+        if (features.azimuthDeg >= -20) {
+          for (const id of lc4Right) currentBuffer[id] += loomingDrive * 1.4;
+          for (const id of lc6Right) currentBuffer[id] += loomingDrive * 1.1;
+        }
       }
     }
 
     // 3. LPLC (Radial Expansion & Optic Flow)
-    if (features.isApproaching && features.angularSizeDeg > 0.8) {
-      const expDrive = Math.min(35.0, features.angularSizeDeg * 7.0);
-      if (features.azimuthDeg <= 0) {
+    if (features.isApproaching && features.angularSizeDeg > 0.6) {
+      const expDrive = Math.min(45.0, features.angularSizeDeg * 8.5);
+      if (features.azimuthDeg <= 5) {
         for (const id of lplcLeft) currentBuffer[id] += expDrive;
       }
-      if (features.azimuthDeg >= 0) {
+      if (features.azimuthDeg >= -5) {
         for (const id of lplcRight) currentBuffer[id] += expDrive;
       }
     }

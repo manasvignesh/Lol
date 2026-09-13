@@ -531,4 +531,194 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       expect(game.fly.z).toBeLessThan(-0.5);
     });
   });
+
+  describe("6. Embodiment State Machine, Procedural Stroke & Strict Physical Collision", () => {
+    it("transitions through IDLE -> TRACKING -> PREPARE -> STRIKE -> RECOVER during shot interception", () => {
+      const embodiment = new EmbodimentAdapter();
+      const bio = {
+        steeringTorque: 0.2,
+        forwardThrust: 0.3,
+        brakingDrive: 0.0,
+        turnImpulse: 0.1,
+        escapeActivation: 0.2,
+        locomotorDrive: 0.5,
+        flightState: "HOVER" as const,
+      };
+
+      const features = {
+        distance: 3.5,
+        azimuthDeg: 0,
+        elevationDeg: 0,
+        relativeSpeed: 10,
+        loomingRate: 0.03,
+        angularSizeDeg: 3,
+        retinalVelocityDegPerSec: 5,
+        isApproaching: true,
+        incomingTrajectoryThreat: 0.7,
+      };
+
+      // Initial state: IDLE with distant shuttle
+      let cmd = embodiment.adapt(
+        bio,
+        features,
+        0.016,
+        {
+          shuttlePos: [0, 2.0, 4.0],
+          shuttleVel: [0, -1.0, -10.0],
+          flyPos: [0, 1.4, -3.9],
+          flyHeading: 0,
+          time: 0.0,
+        },
+        "demo-assist",
+      );
+      expect(["IDLE", "TRACKING"]).toContain(cmd.racketState);
+
+      // Approaching into PREPARE window
+      let sawPrepare = false;
+      let sawStrike = false;
+      for (let step = 1; step <= 80; step++) {
+        const time = step * 0.016;
+        const sz = 3.0 - step * 0.08;
+        cmd = embodiment.adapt(
+          bio,
+          features,
+          0.016,
+          {
+            shuttlePos: [0.2, 1.6, sz],
+            shuttleVel: [0, -0.5, -8.0],
+            flyPos: [0, 1.4, -3.9],
+            flyHeading: 0,
+            time,
+          },
+          "demo-assist",
+        );
+
+        if (cmd.racketState === "PREPARE") sawPrepare = true;
+        if (cmd.racketState === "STRIKE") {
+          sawStrike = true;
+          // Strike must be preceded by prepare
+          expect(sawPrepare).toBe(true);
+          expect(cmd.targetRacketPos).toBeDefined();
+          expect(cmd.targetRacketVel).toBeDefined();
+        }
+      }
+
+      expect(sawPrepare).toBe(true);
+      expect(sawStrike).toBe(true);
+    });
+
+    it("verifies procedural 3D Bézier stroke produces continuous position and velocity trajectories", () => {
+      const embodiment = new EmbodimentAdapter();
+      const bio = {
+        steeringTorque: 0,
+        forwardThrust: 0,
+        brakingDrive: 0,
+        turnImpulse: 0.8,
+        escapeActivation: 0.8,
+        locomotorDrive: 0.8,
+        flightState: "HOVER" as const,
+      };
+      const features = {
+        distance: 1.0,
+        azimuthDeg: 0,
+        elevationDeg: 0,
+        relativeSpeed: 10,
+        loomingRate: 0.05,
+        angularSizeDeg: 5,
+        retinalVelocityDegPerSec: 10,
+        isApproaching: true,
+        incomingTrajectoryThreat: 0.9,
+      };
+
+      // Force immediate strike
+      let prevPos: [number, number, number] | null = null;
+      for (let step = 0; step < 30; step++) {
+        const cmd = embodiment.adapt(
+          bio,
+          features,
+          0.016,
+          {
+            shuttlePos: [0.3, 1.5, -3.2],
+            shuttleVel: [0, -1.0, -8.0],
+            flyPos: [0, 1.4, -3.9],
+            flyHeading: 0,
+            time: step * 0.016,
+          },
+          "demo-assist",
+        );
+
+        if (cmd.targetRacketPos) {
+          if (prevPos) {
+            const stepDist = Math.hypot(
+              cmd.targetRacketPos[0] - prevPos[0],
+              cmd.targetRacketPos[1] - prevPos[1],
+              cmd.targetRacketPos[2] - prevPos[2],
+            );
+            // Must be continuous without instantaneous teleportation
+            expect(stepDist).toBeLessThan(0.45);
+          }
+          prevPos = [...cmd.targetRacketPos];
+        }
+      }
+    });
+
+    it("returns synthetic test shots in demo-assist mode across distinct trajectories", async () => {
+      for (const scenario of [
+        "left",
+        "right",
+        "center",
+        "high",
+        "fast",
+        "drop",
+      ] as const) {
+        const game = new Game({
+          ...defaults,
+          opponentType: "fruitfly",
+          flyEmbodimentMode: "demo-assist",
+        });
+        await game.fly.init(false);
+
+        game.feedSyntheticShot(scenario);
+        let returned = false;
+
+        for (let step = 0; step < 260; step++) {
+          game.step(1 / 120);
+          if (game.shuttle.lastHit === 1 || game.hits >= 2) {
+            returned = true;
+            break;
+          }
+          if (game.state === "point") break;
+        }
+
+        expect(returned).toBe(true);
+      }
+    });
+
+    it("verifies silencing visual projection neurons (LC4/6/10) causes returns to fail causally", async () => {
+      const game = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "demo-assist",
+      });
+      await game.fly.init(false);
+      game.fly.bridge.applyInterventions({
+        silencedTypes: ["LC4", "LC6", "LC10", "LPLC1", "LPLC2"],
+      });
+
+      game.feedSyntheticShot("left");
+      let returned = false;
+
+      for (let step = 0; step < 260; step++) {
+        game.step(1 / 120);
+        if (game.shuttle.lastHit === 1 || game.hits >= 2) {
+          returned = true;
+          break;
+        }
+        if (game.state === "point") break;
+      }
+
+      // Without visual projection input, the connectome receives no stimulus and cannot return
+      expect(returned).toBe(false);
+    });
+  });
 });

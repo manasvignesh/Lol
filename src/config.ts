@@ -42,6 +42,7 @@ export type Settings = {
   debug: boolean;
   camera: string;
   opponentType: "fruitfly" | "classic";
+  flyEmbodimentMode: "demo-assist" | "scientific";
 };
 export const defaults: Settings = {
   sensitivity: 1,
@@ -53,6 +54,7 @@ export const defaults: Settings = {
   debug: false,
   camera: "",
   opponentType: "fruitfly",
+  flyEmbodimentMode: "demo-assist",
 };
 export function readSettings(): Settings {
   try {
