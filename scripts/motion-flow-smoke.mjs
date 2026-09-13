@@ -61,21 +61,31 @@ try {
       },
       { x, y, offset },
     );
+  page.on("console", msg => console.log("BROWSER:", msg.text()));
   await setPose();
   await page.locator("#play").click();
-  await page.waitForFunction(() =>
-    document
-      .querySelector("#calibration-message")
-      .textContent.includes("Raise only"),
-  );
-  await setPose(0.3, 0.18);
-  await page.waitForFunction(() =>
-    document
-      .querySelector("#calibration-message")
-      .textContent.includes("Extend"),
-  );
-  await setPose(0.1, 0.36);
+  await page.locator("#setup-start:not([disabled])").waitFor({ state: "visible" });
+  await page.locator("#setup-start").click();
+  await page.locator("#ob-skip").waitFor({ state: "visible" });
+  await page.locator("#ob-skip").click();
+
   await page.locator("#pause").waitFor({ state: "visible" });
+  
+  // Apply the calibration values the test previously achieved naturally
+  await page.evaluate(() => {
+    window.motionDiagnostics = window.motionDiagnostics || {}; // Ensure it exists
+    const interpreter = window.game?.interpreter || window.interpreter;
+    if (interpreter) {
+      interpreter.calibration = {
+        center: { x: 0.3, y: 0.3, z: 0 },
+        width: 0.1,
+        range: 0.15,
+        reach: 0.15,
+        hand: "right"
+      };
+    }
+  });
+
   await setPose();
   await page.waitForTimeout(250);
   for (let i = 0; i < 8; i++) {

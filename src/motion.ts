@@ -84,15 +84,23 @@ export const neutralMotion = (): Motion => ({
 
 export function poseQuality(p: Pose | undefined) {
   if (!p || p.length < 33) return 0;
+  // Hips (23, 24) are no longer strictly required for gameplay
   return Math.min(
-    ...[11, 12, 13, 14, 15, 16, 23, 24].map((i) =>
+    ...[11, 12, 13, 14, 15, 16].map((i) =>
       Number.isFinite(p[i].x + p[i].y + p[i].z) ? (p[i].visibility ?? 0) : 0,
     ),
   );
 }
 
-export const bodyCenter = (p: Pose) =>
-  mix(mix(p[11], p[12], 0.5), mix(p[23], p[24], 0.5), 0.5);
+export const bodyCenter = (p: Pose) => {
+  const shoulders = mix(p[11], p[12], 0.5);
+  // Fallback to shoulders if hips are completely invisible/off-screen
+  if ((p[23].visibility || 0) < 0.2 || (p[24].visibility || 0) < 0.2) {
+    return Object.assign({}, shoulders, { y: shoulders.y + 0.2 }); // approximate center based on shoulders
+  }
+  const hips = mix(p[23], p[24], 0.5);
+  return mix(shoulders, hips, 0.5);
+};
 
 export const shoulderWidth = (p: Pose) =>
   Math.max(0.06, Math.hypot(p[11].x - p[12].x, p[11].y - p[12].y));
@@ -259,6 +267,8 @@ export class MotionInterpreter {
     reach: 1.8,
   };
 
+  smoothedZ = 0;
+
   reset() {
     this.filter.reset();
     this.detector.reset();
@@ -266,6 +276,7 @@ export class MotionInterpreter {
     this.previousWrist = null;
     this.previousTime = 0;
     this.previousVelocity = v();
+    this.smoothedZ = 0;
   }
 
   update(
@@ -290,8 +301,25 @@ export class MotionInterpreter {
     const width = c.width;
     const dt = clamp((time - this.previousTime) / 1000, 1 / 120, 0.1);
 
-    // Mirrored display coordinates, shoulder-relative motion rejects torso translation.
-    const relative = v(-(w.x - s.x) / width, -(w.y - s.y) / width, 0);
+    // MediaPipe Z (depth) is inherently noisy.
+    // Calculate raw depth relative to the shoulder.
+    // A smaller MediaPipe Z value means closer to the camera (forward).
+    // We negate it so +Z is forward (away from body).
+    const rawZ = -(w.z - s.z) / width;
+    
+    // Apply temporal smoothing (Exponential Moving Average) to avoid phantom swings from Z jitter
+    this.smoothedZ = this.smoothedZ === 0 ? rawZ : this.smoothedZ + (rawZ - this.smoothedZ) * (1 - Math.exp(-dt * 15));
+    
+    // Apply a dead zone and clamp spikes
+    let dz = this.smoothedZ;
+    if (Math.abs(dz) < 0.1) dz = 0; // dead zone
+    dz = clamp(dz, -2.5, 2.5); // clamp wild swings
+    
+    const relative = v(
+      -(w.x - s.x) / width,
+      -(w.y - s.y) / width,
+      dz
+    );
     let velocity = this.previousWrist
       ? mul(sub(relative, this.previousWrist), 1 / dt)
       : v();
@@ -300,8 +328,8 @@ export class MotionInterpreter {
 
     const acceleration = mul(sub(velocity, this.previousVelocity), 1 / dt);
 
-    const upper = norm(v(-(e.x - s.x), -(e.y - s.y), 0));
-    const forearm = norm(v(-(w.x - e.x), -(w.y - e.y), 0));
+    const upper = norm(v(-(e.x - s.x), -(e.y - s.y), -(e.z - s.z)));
+    const forearm = norm(v(-(w.x - e.x), -(w.y - e.y), -(w.z - e.z)));
     const elbowAngle =
       (Math.acos(clamp(dot(mul(upper, -1), forearm), -1, 1)) * 180) / Math.PI;
 

@@ -1,5 +1,5 @@
 import { C, type Settings } from "./config";
-import { clamp, len, v, mix, sweptDistance, type V3 } from "./math";
+import { clamp, len, v, mix, sweptDistance, type V3, add, sub, mul } from "./math";
 import {
   integrate,
   inCourt,
@@ -88,6 +88,7 @@ export class Game {
   lastContact = -10;
   events: GameEvent[] = [];
   lastShot = "READY";
+  history: { time: number; racket: V3; prevRacket: V3; shuttleP: V3; shuttlePrev: V3 }[] = [];
 
   constructor(
     public settings: Settings,
@@ -135,6 +136,7 @@ export class Game {
     this.fly.swingAttempted = false;
     this.lastShot =
       this.match.server === 0 ? "SWING TO SERVE" : "OPPONENT SERVING";
+    this.history = [];
   }
 
   step(dt: number) {
@@ -262,19 +264,48 @@ export class Game {
           this.motion.swingId !== this.usedSwing;
 
         if (isConfirmedSwing) {
+          const visualRadius = C.racketBladeRadius[this.settings.assist] || 0.42;
+          const gameplayRadiusMult = this.settings.assist === "beginner" ? 2.4 : 1.2;
+          const racketRadius = visualRadius * gameplayRadiusMult;
+          
           const depthScale = this.settings.assist === "beginner" ? 1.81 : 1.5;
           const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
-          const serveContact = sweptDistance(
+          
+          const lookaheadDt = 0.12; 
+          const racketVelPerFrame = sub(this.racket, this.previousRacket);
+          const racketFuture = add(this.racket, mul(racketVelPerFrame, lookaheadDt / C.dt));
+          
+          const contactNow = sweptDistance(
             scaleP(this.previousRacket),
             scaleP(this.racket),
             scaleP(heldPos),
             scaleP(heldPos),
           );
-          // Serve requires more precision. We don't use the massive 0.66m beginner radius.
-          const serveRadius = 0.45;
+          
+          const contactPredicted = sweptDistance(
+            scaleP(this.racket),
+            scaleP(racketFuture),
+            scaleP(heldPos),
+            scaleP(heldPos),
+          );
 
-          if (serveContact.distance < serveRadius) {
+          let closestDistance = contactNow.distance;
+          let isPredictedHit = false;
+
+          if (contactPredicted.distance < contactNow.distance) {
+            closestDistance = contactPredicted.distance;
+            isPredictedHit = true;
+          }
+
+          if (closestDistance < racketRadius) {
             this.usedSwing = this.motion.swingId;
+            // Magnetism for serve
+            if (this.settings.assist === "beginner") {
+                const magnetismPoint = isPredictedHit ? this.racket : mix(this.racket, this.shuttle.p, 0.4);
+                if (len(sub(magnetismPoint, this.shuttle.p)) < visualRadius * 1.5) {
+                    this.shuttle.p = { ...magnetismPoint };
+                }
+            }
             this.hit(0, "serve");
           }
         }
@@ -347,25 +378,39 @@ export class Game {
       this.primedSwing = null;
     }
 
-    if (s.lastHit === 1 && s.p.z > 0.1) {
-      const baseRadius = C.racketBladeRadius[this.settings.assist] || 0.42;
-      const incomingSpeed = len(s.velocity);
-      const speedAssist = clamp((incomingSpeed - 8) / 12, 0, 1) * 0.10; // max 0.10m assist
-      const racketRadius = baseRadius + speedAssist;
+    // Keep history of racket and shuttle positions for latency tolerance
+    if (!this.history) this.history = [];
+    this.history.push({ time: this.time, racket: { ...this.racket }, prevRacket: { ...this.previousRacket }, shuttleP: { ...s.p }, shuttlePrev: { ...s.prev } });
+    if (this.history.length > 20) this.history.shift();
 
-      // Anisotropic scaling: Z (depth) is tighter than X/Y.
-      // E.g., for beginner base radius 0.58, we want depth tolerance ~0.32
-      // Scale Z differences up by 1.8 so a 0.32 Z-distance is treated as 0.58.
-      const depthScale = this.settings.assist === "beginner" ? 1.81 : 1.5;
+    if (s.lastHit === 1 && s.p.z > -0.5) {
+      // 1. EXPAND EFFECTIVE HIT ZONE
+      const visualRadius = C.racketBladeRadius[this.settings.assist] || 0.42;
+      const gameplayRadiusMult = this.settings.assist === "beginner" ? 2.4 : 1.2;
+      const racketRadius = visualRadius * gameplayRadiusMult;
+
+      const depthScale = this.settings.assist === "beginner" ? 1.8 : 1.4;
       const scaleP = (p: V3) => v(p.x, p.y, p.z * depthScale);
 
-      const contact = sweptDistance(
-        scaleP(this.previousRacket),
-        scaleP(this.racket),
-        scaleP(s.prev),
-        scaleP(s.p),
-      );
+      // 2. SHORT BUFFER LATENCY TOLERANCE
+      // We check if the racket and shuttle intersected at ANY point in our recent ~150ms buffer
+      let closestDistance = Infinity;
 
+      for (let i = 0; i < this.history.length; i++) {
+        const frame = this.history[i];
+        if (this.time - frame.time > 0.15) continue; // Only evaluate up to 150ms ago
+        
+        const d = sweptDistance(
+          scaleP(frame.prevRacket),
+          scaleP(frame.racket),
+          scaleP(frame.shuttlePrev),
+          scaleP(frame.shuttleP)
+        ).distance;
+        
+        if (d < closestDistance) closestDistance = d;
+      }
+
+      // Best distance is closest historical distance
       let hitAccepted = false;
       let hitRejectedReason: HumanHitRejectedReason = "NONE";
 
@@ -375,18 +420,25 @@ export class Game {
         hitRejectedReason = "SWING_ALREADY_USED";
       } else if (this.time - this.lastContact <= 0.18) {
         hitRejectedReason = "STALE_SWING";
-      } else if (s.p.y < 0.15 || s.p.y > 3.6) {
+      } else if (s.p.y < 0.15 || s.p.y > 3.8) {
         hitRejectedReason = "SHUTTLE_WRONG_SIDE";
-      } else if (contact.distance >= racketRadius) {
+      } else if (closestDistance >= racketRadius) {
         hitRejectedReason = "NO_PHYSICAL_CONTACT";
       } else {
-        // Physical racket intersection with confirmed swing
         hitAccepted = true;
         this.usedSwing = this.primedSwing.id;
         const hitIntent = this.primedSwing.intent;
         this.primedSwing = null;
         this.armedPrediction = null;
         this.lastContact = this.time;
+        
+        // Ensure visual effect for contact
+        this.events.push({
+          type: "swing", // Use a generic event or we can rely on "hit" which pushes event anyway
+          text: "CONTACT",
+          position: { ...s.p },
+        });
+
         this.hit(0, hitIntent);
         this.footworkState = "RECOVERING";
       }
@@ -405,7 +457,7 @@ export class Game {
         racketCurrent: [this.racket.x, this.racket.y, this.racket.z],
         shuttlePrev: [s.prev.x, s.prev.y, s.prev.z],
         shuttleCurrent: [s.p.x, s.p.y, s.p.z],
-        sweptDistance: contact.distance,
+        sweptDistance: closestDistance,
         contactRadius: racketRadius,
         contactTime: this.time,
         hitAccepted,
@@ -604,16 +656,27 @@ export class Game {
     // Directional aim from swing direction and body intent
     let aim = 0;
     if (side === 0) {
+      // With Z correctly mapped in motion.ts, direction.x is purely lateral intent
       aim =
-        this.motion.direction.x * 1.8 + this.playerPos.x * 0.12 + timing * 0.18;
-      if (this.motion.intentDirection === "left") aim -= 0.5;
-      else if (this.motion.intentDirection === "right") aim += 0.5;
-      aim = clamp(aim, -2.2, 2.2);
+        this.motion.direction.x * 2.2 + this.playerPos.x * 0.15 + timing * 0.2;
+      
+      if (this.motion.intentDirection === "left") aim -= 0.6;
+      else if (this.motion.intentDirection === "right") aim += 0.6;
+      
+      aim = clamp(aim, -2.5, 2.5);
+
+      if (this.settings.assist === "beginner") {
+        // Soft clamp the trajectory towards the center of the court (±1.5)
+        // while preserving the intent (left or right)
+        if (aim > 1.5) aim = 1.5 + (aim - 1.5) * 0.3; // dampen extreme right
+        if (aim < -1.5) aim = -1.5 + (aim + 1.5) * 0.3; // dampen extreme left
+      }
+
       power = clamp(
-        this.motion.power * 0.92 +
-          incomingSpeed / 140 -
-          Math.abs(timing) * 0.06,
-        0.15,
+        this.motion.power * 0.95 +
+          incomingSpeed / 130 -
+          Math.abs(timing) * 0.05,
+        0.18,
         1,
       );
       this.fly.swingAttempted = false;
@@ -655,6 +718,11 @@ export class Game {
         2.0,
       );
       power = clamp(flyMotor.swingPower || 0.55, 0.35, 0.9);
+      // Gentle first rallies: reduce power (increases float time) for first few hits if on Casual
+      if (this.settings.assist === "beginner" && this.totalHits < 6) {
+         const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
+         power *= handicap;
+      }
     } else {
       // Classic AI heuristic aiming
       aim = clamp(
@@ -663,6 +731,10 @@ export class Game {
         1.8,
       );
       power = 0.55;
+      if (this.settings.assist === "beginner" && this.totalHits < 6) {
+         const handicap = 0.75 + (1.0 - 0.75) * (this.totalHits / 6);
+         power *= handicap;
+      }
     }
 
     const error =

@@ -82,14 +82,16 @@ $("#app").innerHTML = `
 <main id="home" class="panel screen">
   <div class="eyebrow">NEUROSCIENCE EXPERIMENT / 01</div>
   <h1>Human vs Fruit-Fly.<br>Connectome <em>Badminton.</em></h1>
-  <p class="intro">Play badminton against an opponent powered by a real <em>Drosophila</em> connectome simulation (HHMI Janelia MaleCNS v1.0).<br>Stand in place, lean to position, and swing naturally.</p>
+  <p class="intro">Play badminton against an opponent powered by a real <em>Drosophila</em> connectome simulation (HHMI Janelia MaleCNS v1.0).<br>No headset. No controller. Just your camera.</p>
   <div class="cta-row">
-    <button class="primary" id="play">PLAY WITH CAMERA <span>↗</span></button>
-    <button class="secondary" id="keyboard">KEYBOARD TEST MODE →</button>
+    <button class="primary" id="play">PLAY NOW <span>↗</span></button>
+    <button class="secondary" id="how-it-works">HOW IT WORKS</button>
   </div>
   <div class="home-actions">
-    <button id="calibrate">Calibrate Camera</button>
     <button id="home-settings">Settings</button>
+  </div>
+  <div id="developer-tools" class="hidden">
+    <button class="secondary" id="keyboard">KEYBOARD TEST MODE →</button>
     <button id="synthetic">Synthetic Pose Diagnostic</button>
   </div>
   <div class="safety">↔ &nbsp; Play from where you stand (~1m space). Avatar handles court traversal.<small>No cloud inference · 100% on-device MediaPipe & LIF connectome simulation.</small></div>
@@ -117,15 +119,42 @@ $("#app").innerHTML = `
   </div>
 </div>
 
-<section id="calibration" class="screen hidden dialog">
-  <div class="eyebrow">FIND YOUR FORM</div>
+<section id="camera-setup" class="screen hidden dialog">
+  <div class="eyebrow">CHOOSE YOUR CAMERA</div>
   <h2>Let’s get you ready.</h2>
-  <p id="calibration-message">Connecting your camera…</p>
-  <div class="progress"><i id="calibration-progress"></i></div>
-  <div class="steps"><span>Position</span><span>Racket hand</span><span>Reach & Intent</span></div>
-  <p class="muted">Face the camera with your upper body visible.<br>Stay in place — small body shifts and natural swings control the game.</p>
-  <button id="calibration-cancel" class="secondary">Back to home</button>
+  
+  <div class="camera-preview-container">
+    <video id="setup-video" autoplay playsinline muted></video>
+    <div id="setup-guide">Upper body + racket arm is enough.</div>
+  </div>
+
+  <div class="setup-controls">
+    <label>Camera:
+      <select id="setup-camera-select"><option value="">Default camera</option></select>
+    </label>
+    <div class="setup-hand-toggle">
+      <span>Playing hand:</span>
+      <button id="setup-hand-right" class="active">Right</button>
+      <button id="setup-hand-left">Left</button>
+    </div>
+    <div id="setup-tracking-status">● Connecting...</div>
+  </div>
+
+  <div class="cta-row">
+    <button id="setup-start" class="primary" disabled>START GAME <span>↗</span></button>
+    <button id="setup-cancel" class="secondary">Back to home</button>
+  </div>
 </section>
+
+<div id="onboarding" class="screen hidden dialog onboarding-card">
+  <div class="eyebrow" id="ob-step-label">STEP 1 OF 5</div>
+  <h2 id="ob-title">Move</h2>
+  <p id="ob-desc">You don't need to walk around your room.<br>Lean slightly and the avatar handles court movement.</p>
+  <div class="ob-actions">
+    <button id="ob-next" class="primary">NEXT</button>
+    <button id="ob-skip" class="text-button">SKIP TUTORIAL</button>
+  </div>
+</div>
 
 <div id="hud" class="screen hidden">
   <div class="scoreboard">
@@ -347,22 +376,29 @@ $("#app").innerHTML = `
   <div class="eyebrow">CONFIGURATION</div>
   <h2>Settings</h2>
   <div class="setting-grid">
-    <label>Opponent Type
-      <select id="opponent-type">
-        <option value="fruitfly">Fruit-Fly Connectome (MaleCNS v1.0)</option>
-        <option value="classic">Classic Scripted AI</option>
-      </select>
-    </label>
     <label>Camera<select id="camera-select"><option value="">Default camera</option></select></label>
     <label>Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="normal">Normal</option></select></label>
-    <label>Motion assistance<select id="assist"><option value="beginner">Beginner</option><option value="normal">Normal</option></select></label>
-    <label>Swing sensitivity<input id="sensitivity" type="range" min="0.6" max="1.8" step="0.1"></label>
-    <label>Movement sensitivity<input id="movement" type="range" min="0.5" max="1.8" step="0.1"></label>
+    <label>Motion assistance<select id="assist"><option value="beginner">Casual (Beginner)</option><option value="normal">Precision (Normal)</option></select></label>
     <label>Audio volume<input id="volume" type="range" min="0" max="1" step="0.05"></label>
-    <label class="check"><input id="preview" type="checkbox"> Webcam preview</label>
-    <label class="check"><input id="debug" type="checkbox"> Developer overlay</label>
   </div>
-  <p class="muted">Racket hand: <span id="hand-label">not calibrated</span>.<br>Changing camera requires recalibration.</p>
+  <div class="settings-advanced hidden" id="settings-advanced">
+    <hr>
+    <h4>Advanced Settings</h4>
+    <div class="setting-grid">
+      <label>Opponent Type
+        <select id="opponent-type">
+          <option value="fruitfly">Fruit-Fly Connectome (MaleCNS v1.0)</option>
+          <option value="classic">Classic Scripted AI</option>
+        </select>
+      </label>
+      <label>Swing sensitivity<input id="sensitivity" type="range" min="0.6" max="1.8" step="0.1"></label>
+      <label>Movement sensitivity<input id="movement" type="range" min="0.5" max="1.8" step="0.1"></label>
+      <label class="check"><input id="preview" type="checkbox"> Webcam preview</label>
+      <label class="check"><input id="debug" type="checkbox"> Developer overlay</label>
+    </div>
+  </div>
+  <button id="settings-toggle-advanced" class="text-button">Show Advanced</button>
+  <button id="settings-replay-tutorial" class="secondary">Replay Tutorial</button>
   <button id="settings-done" class="primary">SAVE SETTINGS</button>
 </section>
 
@@ -517,27 +553,114 @@ function startGame() {
   toggleBrainPanel(true);
 }
 
-async function startCamera() {
+async function openCameraSetup() {
   audio.unlock();
   audio.volume = settings.volume;
   mode = "camera";
   calibrated = false;
-  calibration = new CalibrationManager();
   interpreter.reset();
   lastPose = null;
   lastGood = 0;
   previousPoseTime = 0;
-  setScreen("calibration");
-  $("#calibration-message").textContent =
-    "Connecting camera and loading local pose model…";
+  
+  setScreen("camera-setup");
+  $<HTMLVideoElement>("#setup-video").srcObject = null;
+  $("#setup-tracking-status").textContent = "● Connecting...";
+  $<HTMLButtonElement>("#setup-start").disabled = true;
+
   try {
     await camera.start(settings.camera);
     void populateCameras();
+    $<HTMLVideoElement>("#setup-video").srcObject = camera.stream;
+    $("#setup-tracking-status").textContent = "● Camera ready";
+    $<HTMLButtonElement>("#setup-start").disabled = false;
   } catch (e) {
     home();
     showError((e as Error).message);
   }
 }
+
+let explicitHand: "left" | "right" = "right";
+$("#setup-hand-right").addEventListener("click", () => {
+  explicitHand = "right";
+  $("#setup-hand-right").classList.add("active");
+  $("#setup-hand-left").classList.remove("active");
+});
+$("#setup-hand-left").addEventListener("click", () => {
+  explicitHand = "left";
+  $("#setup-hand-left").classList.add("active");
+  $("#setup-hand-right").classList.remove("active");
+});
+
+$("#setup-camera-select").addEventListener("change", async (e) => {
+  const deviceId = (e.target as HTMLSelectElement).value;
+  settings.camera = deviceId;
+  await camera.start(deviceId);
+  $<HTMLVideoElement>("#setup-video").srcObject = camera.stream;
+});
+
+$("#setup-start").addEventListener("click", () => {
+  calibrated = true;
+  // Apply the default background calibration with chosen hand
+  interpreter.calibration = {
+    center: { x: 0.5, y: 0.5, z: 0 },
+    width: 0.25,
+    range: 0.35,
+    reach: 0.35,
+    hand: explicitHand,
+  };
+  
+  if (!localStorage.getItem("onboardingCompleted")) {
+    startOnboarding();
+  } else {
+    startGame();
+  }
+});
+
+$("#setup-cancel").addEventListener("click", home);
+
+let onboardingStep = 0;
+const onboardingData = [
+  { title: "Move", desc: "You don't need to walk around your room.<br>Lean slightly and the avatar handles court movement." },
+  { title: "Swing", desc: "Swing naturally with your racket hand.<br>You don't need perfect positioning." },
+  { title: "The Fly", desc: "Your opponent uses a MaleCNS-derived fruit-fly connectome simulation." },
+  { title: "Connectome Lab", desc: "Open this anytime to see the simulated neural activity driving the opponent." },
+  { title: "Ready", desc: "That's it. Keep the shuttle alive." }
+];
+
+function startOnboarding() {
+  onboardingStep = 0;
+  setScreen("onboarding");
+  updateOnboardingUI();
+}
+
+function updateOnboardingUI() {
+  const step = onboardingData[onboardingStep];
+  $("#ob-step-label").textContent = `STEP ${onboardingStep + 1} OF ${onboardingData.length}`;
+  $("#ob-title").textContent = step.title;
+  $("#ob-desc").innerHTML = step.desc;
+  
+  if (onboardingStep === onboardingData.length - 1) {
+    $("#ob-next").textContent = "PLAY";
+  } else {
+    $("#ob-next").textContent = "NEXT";
+  }
+}
+
+$("#ob-next").addEventListener("click", () => {
+  if (onboardingStep < onboardingData.length - 1) {
+    onboardingStep++;
+    updateOnboardingUI();
+  } else {
+    localStorage.setItem("onboardingCompleted", "true");
+    startGame();
+  }
+});
+
+$("#ob-skip").addEventListener("click", () => {
+  localStorage.setItem("onboardingCompleted", "true");
+  startGame();
+});
 
 camera.onError = (message) => {
   if (screen === "game") setScreen("pause-screen");
@@ -547,29 +670,11 @@ camera.onError = (message) => {
 camera.onPose = (pose, timestamp) => {
   lastPose = pose;
   const now = performance.now();
-  if (pose && poseQuality(pose)) lastGood = now;
-  if (screen === "calibration" && calibration) {
-    const dt = previousPoseTime
-      ? Math.max(0.008, Math.min(0.1, (timestamp - previousPoseTime) / 1000))
-      : 0.033;
-    previousPoseTime = timestamp;
-    const res = calibration.update(pose || undefined, dt);
-    $("#calibration-progress").style.width =
-      `${Math.round(calibration.progress * 100)}%`;
-    $("#calibration-message").textContent = res.message;
-    document
-      .querySelectorAll("#calibration .steps span")
-      .forEach((el, index) => {
-        el.classList.toggle("active", index === calibration!.stage);
-      });
-    if (res.done) {
-      calibrated = true;
-      interpreter.calibration = res.done;
-      $("#hand-label").textContent = `${res.done.hand.toUpperCase()} HAND`;
-      startGame();
-    }
-    return;
+  if (pose && poseQuality(pose)) {
+    lastGood = now;
+    // Silent background calibration improvement can happen here in the future
   }
+
   if (screen === "game" && calibrated && pose) {
     const motion = interpreter.update(pose, timestamp);
     if (motion) game.setMotion(motion);
@@ -977,8 +1082,9 @@ document.querySelectorAll(".shot-btn").forEach((btn) => {
 });
 
 // UI Navigation listeners
-$("#play").addEventListener("click", () => void startCamera());
-$("#calibrate").addEventListener("click", () => void startCamera());
+$("#play").addEventListener("click", () => void openCameraSetup());
+$("#how-it-works").addEventListener("click", triggerScienceSplash);
+
 $("#keyboard").addEventListener("click", () => {
   audio.unlock();
   mode = "keyboard";
@@ -994,9 +1100,9 @@ $("#synthetic").addEventListener("click", () => {
 $("#pause").addEventListener("click", () => setScreen("pause-screen"));
 $("#resume").addEventListener("click", () => setScreen("game"));
 $("#restart").addEventListener("click", startGame);
-$("#recalibrate").addEventListener("click", () => void startCamera());
+$("#recalibrate").addEventListener("click", () => void openCameraSetup());
 $("#back-home").addEventListener("click", home);
-$("#calibration-cancel").addEventListener("click", home);
+
 $("#play-again").addEventListener("click", startGame);
 $("#results-home").addEventListener("click", home);
 $("#home-settings").addEventListener("click", openSettings);
@@ -1004,6 +1110,20 @@ $("#settings-open").addEventListener("click", openSettings);
 $("#error-close").addEventListener("click", () =>
   $("#error").classList.add("hidden"),
 );
+
+$("#settings-toggle-advanced").addEventListener("click", () => {
+  const adv = $("#settings-advanced");
+  const isHidden = adv.classList.contains("hidden");
+  adv.classList.toggle("hidden", !isHidden);
+  $("#settings-toggle-advanced").textContent = isHidden ? "Hide Advanced" : "Show Advanced";
+});
+
+$("#settings-replay-tutorial").addEventListener("click", () => {
+  // Save settings first just in case
+  $("#settings-done").click();
+  localStorage.removeItem("onboardingCompleted");
+  openCameraSetup(); // Jump into setup -> tutorial
+});
 
 let screenBeforeSettings = "home";
 
@@ -1060,7 +1180,7 @@ $("#settings-done").addEventListener("click", () => {
   );
 
   if (cameraChanged && camera.running) {
-    void startCamera();
+    void openCameraSetup();
   } else {
     setScreen(
       screenBeforeSettings !== "settings"

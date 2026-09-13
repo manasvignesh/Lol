@@ -1491,3 +1491,90 @@ body.presentation-mode .bio-metric b,
 body.presentation-mode .embodiment-metric b {
   font-size: 10px;
 }
+/* UX Overhaul Styles */
+#camera-setup {
+  text-align: center;
+}
+.camera-preview-container {
+  margin: 20px auto;
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+#setup-video {
+  width: 100%;
+  display: block;
+  transform: scaleX(-1);
+}
+#setup-guide {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.6);
+  padding: 8px;
+  font-size: 10px;
+  color: #c5ed89;
+  letter-spacing: 1px;
+}
+.setup-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.setup-hand-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.setup-hand-toggle button {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 6px 16px;
+  border-radius: 20px;
+  color: #88a;
+}
+.setup-hand-toggle button.active {
+  background: #c5ed89;
+  color: #0b171b;
+  border-color: #c5ed89;
+}
+#setup-tracking-status {
+  font-size: 11px;
+  color: #45d0df;
+  font-family: monospace;
+}
+.onboarding-card {
+  max-width: 380px;
+}
+.ob-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+.cta-row {
+  display: flex;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  #brain-panel {
+    transform: translateY(calc(100% - 40px));
+    height: 60vh;
+  }
+  #brain-panel:focus-within,
+  #brain-panel:hover {
+    transform: translateY(0);
+  }
+  .brain-header {
+    cursor: pointer;
+  }
+}

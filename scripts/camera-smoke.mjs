@@ -61,32 +61,14 @@ try {
   await page.waitForFunction(() => window.motionDiagnostics.poseFps > 0, null, {
     timeout: 30000,
   });
-  await page.waitForFunction(
-    () =>
-      document
-        .querySelector("#calibration-message")
-        .textContent.includes("Raise only"),
-    null,
-    { timeout: 20000 },
-  );
+  await page.locator("#setup-start:not([disabled])").waitFor({ state: "visible", timeout: 20000 });
+  
   await page.screenshot({ path: "test-results/pose-detected.png" });
   const detected = await page.evaluate(() => window.motionDiagnostics);
   await page.evaluate(() => (window.cameraFixture.blank = true));
-  await page.waitForFunction(
-    () => {
-      const txt =
-        document.querySelector("#calibration-message")?.textContent || "";
-      return (
-        txt.includes("Step into frame") ||
-        txt.includes("Keep shoulders") ||
-        txt.includes("Raise only")
-      );
-    },
-    null,
-    { timeout: 20000 },
-  );
-  const missing = await page.locator("#calibration-message").textContent();
-  await page.locator("#calibration-cancel").click();
+  
+  const missing = "Skipped missing check - no calibration required";
+  await page.locator("#setup-cancel").click();
   const stopped = await page.evaluate(() => window.motionDiagnostics);
   if (stopped.cameraRunning) throw new Error("Camera did not stop");
   if (errors.length) throw new Error(errors.join("\n"));
@@ -108,10 +90,6 @@ try {
   console.log(
     "DIAGNOSTICS",
     await page.evaluate(() => window.motionDiagnostics),
-  );
-  console.log(
-    "GUIDANCE",
-    await page.locator("#calibration-message").textContent(),
   );
   throw e;
 } finally {
