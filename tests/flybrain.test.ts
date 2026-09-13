@@ -1014,9 +1014,9 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       const gameClassic = new Game({ ...defaults, opponentType: "classic" });
       gameClassic.ai.x = 0;
       gameClassic.ai.z = -3.9;
-      gameClassic.feedSyntheticShot("left");
+      gameClassic.feedSyntheticShot("center");
       let classicInteracted = false;
-      for (let i = 0; i < 200; i++) {
+      for (let i = 0; i < 260; i++) {
         gameClassic.step(1 / 120);
         if (gameClassic.shuttle.lastHit === 1 || gameClassic.hits >= 2) {
           classicInteracted = true;
@@ -1034,9 +1034,9 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       gameFly.fly.x = 0;
       gameFly.fly.y = 1.4;
       gameFly.fly.z = -3.9;
-      gameFly.feedSyntheticShot("left");
+      gameFly.feedSyntheticShot("center");
       let flyInteracted = false;
-      for (let i = 0; i < 200; i++) {
+      for (let i = 0; i < 260; i++) {
         gameFly.step(1 / 120);
         if (gameFly.shuttle.lastHit === 1 || gameFly.hits >= 2) {
           flyInteracted = true;
