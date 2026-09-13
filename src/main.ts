@@ -39,7 +39,7 @@ let screen = "home",
   recovery = 0,
   toastUntil = 0,
   syntheticTime = 0,
-  brainPanelOpen = true,
+  brainPanelOpen = false,
   presentationMode = false,
   brainPaused = false,
   scienceSplashTimer = 0;
@@ -70,11 +70,11 @@ $("#app").innerHTML = `
   </a>
   <div class="header-right">
     <div class="opp-toggle-bar">
-      <button id="btn-quick-fly" class="opp-quick-btn active">Fruit-Fly Connectome</button>
-      <button id="btn-quick-classic" class="opp-quick-btn">Classic AI</button>
+      <button id="btn-quick-classic" class="opp-quick-btn active">Classic AI</button>
+      <button id="btn-quick-fly" class="opp-quick-btn">Fruit-Fly Connectome</button>
     </div>
     <button id="btn-toggle-presentation" class="nav-pill-btn" title="Toggle High-Contrast Presentation Mode for Demos">📺 PRESENTATION</button>
-    <button id="btn-toggle-brain" class="brain-nav-btn active">🧠 CONNECTOME LAB</button>
+    <button id="btn-toggle-brain" class="brain-nav-btn">🧠 CONNECTOME LAB</button>
     <button class="icon" id="settings-open" aria-label="Settings">⚙</button>
   </div>
 </header>
@@ -171,7 +171,7 @@ $("#app").innerHTML = `
   <div class="scoreboard">
     <div><span>YOU</span><b id="your-score">00</b></div>
     <i>:</i>
-    <div><span id="opp-label">FRUIT-FLY</span><b id="ai-score">00</b></div>
+    <div><span id="opp-label">CLASSIC AI</span><b id="ai-score">00</b></div>
     <small>RALLY SCORING · FIRST TO 21</small>
   </div>
   <div class="session-label">
@@ -202,7 +202,7 @@ $("#app").innerHTML = `
 </div>
 
 <!-- CONNECTOME NEURAL LAB PANEL (Split-Screen Neuroscience Instrument) -->
-<aside id="brain-panel" class="">
+<aside id="brain-panel" class="hidden">
   <div class="brain-header">
     <div class="brain-title-col">
       <div class="badge-row">
@@ -397,8 +397,8 @@ $("#app").innerHTML = `
     <div class="setting-grid">
       <label>Opponent Type
         <select id="opponent-type">
-          <option value="fruitfly">Fruit-Fly Connectome (MaleCNS v1.0)</option>
           <option value="classic">Classic Scripted AI</option>
+          <option value="fruitfly">Fruit-Fly Connectome (MaleCNS v1.0)</option>
         </select>
       </label>
       <label>Swing sensitivity<input id="sensitivity" type="range" min="0.6" max="1.8" step="0.1"></label>
@@ -496,6 +496,18 @@ try {
 
 $("#preview-box").prepend(camera.video);
 
+// Sync initial UI state from readSettings()
+$("#btn-quick-fly").classList.toggle(
+  "active",
+  settings.opponentType === "fruitfly",
+);
+$("#btn-quick-classic").classList.toggle(
+  "active",
+  settings.opponentType === "classic",
+);
+$("#opp-label").textContent =
+  settings.opponentType === "fruitfly" ? "FRUIT-FLY" : "CLASSIC AI";
+
 function showError(message: string) {
   $("#error-message").textContent = message;
   $("#error").classList.remove("hidden");
@@ -551,7 +563,7 @@ function startGame() {
   triggerScienceSplash();
 
   $("#opp-label").textContent =
-    settings.opponentType === "fruitfly" ? "FRUIT-FLY" : "OPPONENT";
+    settings.opponentType === "fruitfly" ? "FRUIT-FLY" : "CLASSIC AI";
   $("#control-label").textContent =
     mode === "camera"
       ? "CAMERA CONTROL"
@@ -561,10 +573,14 @@ function startGame() {
   $("#keyboard-help").classList.toggle("hidden", mode !== "keyboard");
   $("#synthetic-shot-bar").classList.toggle("hidden", mode !== "keyboard");
 
-  // Keep brain panel collapsed initially for first-time players
-  const hasSeenBrain = localStorage.getItem("brainPanelSeen") === "true";
+  // Connectome-specific UI stays collapsed/hidden unless Fruit-Fly is selected and user previously opened it
+  const isFly = settings.opponentType === "fruitfly";
+  const hasSeenBrain =
+    isFly && localStorage.getItem("brainPanelSeen") === "true";
   toggleBrainPanel(hasSeenBrain);
-  localStorage.setItem("brainPanelSeen", "true");
+  if (isFly) {
+    localStorage.setItem("brainPanelSeen", "true");
+  }
 }
 
 async function openCameraSetup() {

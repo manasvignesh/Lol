@@ -70,7 +70,7 @@ export const defaults: Settings = {
   preview: true,
   debug: false,
   camera: "",
-  opponentType: "fruitfly",
+  opponentType: "classic",
   flyEmbodimentMode: "demo-assist",
 };
 export function readSettings(): Settings {

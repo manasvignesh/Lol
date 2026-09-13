@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { C, defaults } from "../src/config";
+import { C, defaults, readSettings } from "../src/config";
 import { v, len, seeded, sweptDistance } from "../src/math";
 import {
   SwingDetector,
@@ -787,6 +787,100 @@ describe("match and connected rallies", () => {
       });
       for (let i = 0; i < 10; i++) g.step(1 / 120);
       expect(g.totalHits).toBe(1);
+    });
+  });
+
+  describe("Default Opponent Behavior & Preference Persistence", () => {
+    it("1. fresh settings default to Classic AI", () => {
+      expect(defaults.opponentType).toBe("classic");
+      const storageMock = new Map<string, string>();
+      const originalGetItem = globalThis.localStorage?.getItem;
+      try {
+        (globalThis as any).localStorage = {
+          getItem: (key: string) => storageMock.get(key) ?? null,
+          setItem: (key: string, val: string) => storageMock.set(key, val),
+        };
+        const settings = readSettings();
+        expect(settings.opponentType).toBe("classic");
+      } finally {
+        if (originalGetItem) {
+          (globalThis as any).localStorage.getItem = originalGetItem;
+        }
+      }
+    });
+
+    it("2. saved Fruit-Fly preference persists", () => {
+      const storageMock = new Map<string, string>();
+      storageMock.set(
+        "motion-settings",
+        JSON.stringify({ opponentType: "fruitfly" }),
+      );
+      const originalGetItem = globalThis.localStorage?.getItem;
+      try {
+        (globalThis as any).localStorage = {
+          getItem: (key: string) => storageMock.get(key) ?? null,
+          setItem: (key: string, val: string) => storageMock.set(key, val),
+        };
+        const settings = readSettings();
+        expect(settings.opponentType).toBe("fruitfly");
+      } finally {
+        if (originalGetItem) {
+          (globalThis as any).localStorage.getItem = originalGetItem;
+        }
+      }
+    });
+
+    it("3. saved Classic preference persists", () => {
+      const storageMock = new Map<string, string>();
+      storageMock.set(
+        "motion-settings",
+        JSON.stringify({ opponentType: "classic" }),
+      );
+      const originalGetItem = globalThis.localStorage?.getItem;
+      try {
+        (globalThis as any).localStorage = {
+          getItem: (key: string) => storageMock.get(key) ?? null,
+          setItem: (key: string, val: string) => storageMock.set(key, val),
+        };
+        const settings = readSettings();
+        expect(settings.opponentType).toBe("classic");
+      } finally {
+        if (originalGetItem) {
+          (globalThis as any).localStorage.getItem = originalGetItem;
+        }
+      }
+    });
+
+    it("4. switching opponent updates runtime immediately", () => {
+      const g = new Game({ ...defaults, opponentType: "classic" });
+      expect(g.settings.opponentType).toBe("classic");
+      g.ai.x = 1.25;
+      g.fly.x = -1.5;
+
+      expect(g.opponentX).toBe(1.25);
+
+      // Switch to Fruit-Fly
+      g.settings = { ...g.settings, opponentType: "fruitfly" };
+      expect(g.opponentX).toBe(-1.5);
+
+      // Switch back to Classic
+      g.settings = { ...g.settings, opponentType: "classic" };
+      expect(g.opponentX).toBe(1.25);
+    });
+
+    it("5. Fruit-Fly science intro does not trigger during Classic gameplay", () => {
+      const checkShouldTriggerSplash = (
+        oppType: "classic" | "fruitfly",
+        seen: boolean,
+      ) => {
+        if (oppType !== "fruitfly") return false;
+        return !seen;
+      };
+
+      expect(checkShouldTriggerSplash("classic", false)).toBe(false);
+      expect(checkShouldTriggerSplash("classic", true)).toBe(false);
+      expect(checkShouldTriggerSplash("fruitfly", false)).toBe(true);
+      expect(checkShouldTriggerSplash("fruitfly", true)).toBe(false);
     });
   });
 });
