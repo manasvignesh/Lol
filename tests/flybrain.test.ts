@@ -720,5 +720,82 @@ describe("Fruit-Fly Connectome Subsystem", () => {
       // Without visual projection input, the connectome receives no stimulus and cannot return
       expect(returned).toBe(false);
     });
+
+    it("verifies fruit-fly retreats backward to cover deep-court clear shots", async () => {
+      const game = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "demo-assist",
+      });
+      await game.fly.init(false);
+
+      const initialFlyZ = game.fly.z; // -3.9
+      game.feedSyntheticShot("deep");
+
+      let minFlyZ = initialFlyZ;
+      let returned = false;
+
+      for (let step = 0; step < 280; step++) {
+        game.step(1 / 120);
+        if (game.fly.z < minFlyZ) {
+          minFlyZ = game.fly.z;
+        }
+        if (game.shuttle.lastHit === 1 || game.hits >= 2) {
+          returned = true;
+          break;
+        }
+        if (game.state === "point") break;
+      }
+
+      // Fly must retreat backward substantially past initial baseline
+      expect(minFlyZ).toBeLessThan(-4.3);
+      expect(returned).toBe(true);
+    });
+
+    it("verifies DNa02 descending neuron silencing selectively degrades lateral steering", async () => {
+      const gameIntact = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "demo-assist",
+      });
+      await gameIntact.fly.init(false);
+      gameIntact.feedSyntheticShot("left");
+      let intactClosestDist = 999;
+      for (let step = 0; step < 260; step++) {
+        gameIntact.step(1 / 120);
+        if (gameIntact.currentShotDiagnostic) {
+          intactClosestDist = Math.min(
+            intactClosestDist,
+            gameIntact.currentShotDiagnostic.closestDistance,
+          );
+        }
+        if (gameIntact.shuttle.lastHit === 1) break;
+      }
+
+      const gameAblated = new Game({
+        ...defaults,
+        opponentType: "fruitfly",
+        flyEmbodimentMode: "demo-assist",
+      });
+      await gameAblated.fly.init(false);
+      gameAblated.fly.bridge.applyInterventions({
+        silencedTypes: ["DNa02"],
+      });
+      gameAblated.feedSyntheticShot("left");
+      let ablatedClosestDist = 999;
+      for (let step = 0; step < 260; step++) {
+        gameAblated.step(1 / 120);
+        if (gameAblated.currentShotDiagnostic) {
+          ablatedClosestDist = Math.min(
+            ablatedClosestDist,
+            gameAblated.currentShotDiagnostic.closestDistance,
+          );
+        }
+        if (gameAblated.state === "point") break;
+      }
+
+      // Silencing primary descending steering neuron DNa02 impairs lateral interception
+      expect(intactClosestDist).toBeLessThanOrEqual(ablatedClosestDist + 0.1);
+    });
   });
 });

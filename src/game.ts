@@ -11,7 +11,12 @@ import {
 } from "./physics";
 import { neutralMotion, type Motion, type Intent } from "./motion";
 import { FlyOpponent } from "./flybrain/flyOpponent";
-import type { FlyContactDiagnostic, FlyMissReason } from "./flybrain/types";
+import type {
+  FlyContactDiagnostic,
+  FlyMissReason,
+  HumanContactDiagnostic,
+  HumanHitRejectedReason,
+} from "./flybrain/types";
 
 export type GameEvent = {
   type: "hit" | "point" | "net" | "serve" | "swing";
@@ -78,6 +83,8 @@ export class Game {
   motion = neutralMotion();
   usedSwing = -1;
   primedSwing: { id: number; intent: Intent; time: number } | null = null;
+  armedPrediction: { id: number; intent: Intent; time: number } | null = null;
+  lastHumanDiagnostic: HumanContactDiagnostic | null = null;
   lastContact = -10;
   events: GameEvent[] = [];
   lastShot = "READY";
@@ -150,9 +157,9 @@ export class Game {
       else if (this.motion.intentDirection === "back") targetZ += 0.35;
 
       this.targetPos = v(
-        clamp(targetX, -2.4, 2.4),
+        clamp(targetX - 0.35, -2.4, 2.4),
         0,
-        clamp(targetZ, 1.8, 5.6),
+        clamp(targetZ + 0.4, 1.8, 5.6),
       );
       this.footworkState = "INTERCEPTING";
     } else if (this.state === "rally" && this.shuttle.lastHit === 0) {
@@ -239,20 +246,36 @@ export class Game {
         this.settings.opponentType === "fruitfly" ? this.fly.x : this.ai.x;
       const oppZ =
         this.settings.opponentType === "fruitfly" ? this.fly.z : this.ai.z;
-      this.shuttle.p =
+      const heldPos =
         side === 0
-          ? v(this.playerPos.x + 0.3, 1.15, this.playerPos.z - 0.85)
+          ? v(this.playerPos.x + 0.35, 1.05, this.playerPos.z - 0.5)
           : v(oppX, 1.15, oppZ);
+
+      this.shuttle.p = { ...heldPos };
       this.shuttle.prev = { ...this.shuttle.p };
 
-      if (
-        side === 0 &&
-        (this.motion.swing || this.motion.predictedSwing) &&
-        this.motion.confidence > C.confidence &&
-        this.motion.swingId !== this.usedSwing
-      ) {
-        this.usedSwing = this.motion.swingId;
-        this.hit(0, "serve");
+      if (side === 0) {
+        // Human serve: Requires confirmed physical swing AND swept racket head intersection with held shuttle
+        const isConfirmedSwing =
+          this.motion.swing &&
+          this.motion.confidence > C.confidence &&
+          this.motion.swingId !== this.usedSwing;
+
+        if (isConfirmedSwing) {
+          const serveContact = sweptDistance(
+            this.previousRacket,
+            this.racket,
+            heldPos,
+            heldPos,
+          );
+          const serveRadius =
+            (C.racketBladeRadius[this.settings.assist] || 0.35) + 0.08;
+
+          if (serveContact.distance < serveRadius) {
+            this.usedSwing = this.motion.swingId;
+            this.hit(0, "serve");
+          }
+        }
       } else if (side === 1 && this.timer > 1.5) {
         this.hit(1, "serve");
       }
@@ -282,18 +305,36 @@ export class Game {
       return;
     }
 
-    // --- Swing Priming & Assisted Contact Envelope ---
-    const isSwinging =
-      (this.motion.swing || this.motion.predictedSwing) &&
+    // --- Swing Confirmation & Continuous Physical Swept Racket Contact ---
+    // Confirmed swing authorization (predictedSwing alone NEVER authorizes hits)
+    const isConfirmedSwing =
+      this.motion.swing &&
       this.motion.confidence > C.confidence &&
       this.motion.swingId !== this.usedSwing;
 
-    if (isSwinging) {
+    if (isConfirmedSwing) {
       this.primedSwing = {
         id: this.motion.swingId,
         intent: this.motion.intent,
         time: this.time,
       };
+      this.armedPrediction = null;
+    } else if (
+      this.motion.predictedSwing &&
+      this.motion.confidence > C.confidence &&
+      this.motion.swingId !== this.usedSwing
+    ) {
+      // Latency tolerance: armed prediction prepares intent, but does NOT authorize hits on its own
+      this.armedPrediction = {
+        id: this.motion.swingId,
+        intent: this.motion.intent,
+        time: this.time,
+      };
+    }
+
+    // Check if armed prediction expires
+    if (this.armedPrediction && this.time - this.armedPrediction.time > 0.14) {
+      this.armedPrediction = null;
     }
 
     // Check if primed swing is still valid inside timing window
@@ -304,39 +345,60 @@ export class Game {
       this.primedSwing = null;
     }
 
-    if (
-      s.lastHit === 1 &&
-      s.p.z > 0.2 &&
-      this.primedSwing &&
-      this.primedSwing.id !== this.usedSwing &&
-      this.time - this.lastContact > 0.18
-    ) {
-      const radius =
-        C.contactEnvelope[this.settings.assist] *
-        (0.75 + 0.25 * this.motion.confidence);
-
+    if (s.lastHit === 1 && s.p.z > 0.1) {
+      const racketRadius = C.racketBladeRadius[this.settings.assist] || 0.28;
       const contact = sweptDistance(
         this.previousRacket,
         this.racket,
         s.prev,
         s.p,
       );
-      const playerDist = Math.hypot(
-        s.p.x - this.playerPos.x,
-        s.p.z - this.playerPos.z,
-      );
 
-      // Contact succeeds if shuttle enters reachable envelope around avatar or racket
-      if (
-        contact.distance < radius ||
-        (playerDist < radius && s.p.y > 0.25 && s.p.y < 3.3)
-      ) {
+      let hitAccepted = false;
+      let hitRejectedReason: HumanHitRejectedReason = "NONE";
+
+      if (!this.primedSwing) {
+        hitRejectedReason = "NO_CONFIRMED_SWING";
+      } else if (this.primedSwing.id === this.usedSwing) {
+        hitRejectedReason = "SWING_ALREADY_USED";
+      } else if (this.time - this.lastContact <= 0.18) {
+        hitRejectedReason = "STALE_SWING";
+      } else if (s.p.y < 0.15 || s.p.y > 3.6) {
+        hitRejectedReason = "SHUTTLE_WRONG_SIDE";
+      } else if (contact.distance >= racketRadius) {
+        hitRejectedReason = "NO_PHYSICAL_CONTACT";
+      } else {
+        // Physical racket intersection with confirmed swing
+        hitAccepted = true;
         this.usedSwing = this.primedSwing.id;
         const hitIntent = this.primedSwing.intent;
         this.primedSwing = null;
+        this.armedPrediction = null;
+        this.lastContact = this.time;
         this.hit(0, hitIntent);
         this.footworkState = "RECOVERING";
       }
+
+      this.lastHumanDiagnostic = {
+        time: this.time,
+        humanSwingId: this.motion.swingId,
+        predictedSwing: this.motion.predictedSwing,
+        confirmedSwing: this.motion.swing,
+        motionState: this.motion.state,
+        racketPrev: [
+          this.previousRacket.x,
+          this.previousRacket.y,
+          this.previousRacket.z,
+        ],
+        racketCurrent: [this.racket.x, this.racket.y, this.racket.z],
+        shuttlePrev: [s.prev.x, s.prev.y, s.prev.z],
+        shuttleCurrent: [s.p.x, s.p.y, s.p.z],
+        sweptDistance: contact.distance,
+        contactRadius: racketRadius,
+        contactTime: this.time,
+        hitAccepted,
+        hitRejectedReason,
+      };
     }
 
     // --- Opponent Return Logic ---
@@ -372,11 +434,39 @@ export class Game {
 
         if (this.currentShotDiagnostic) {
           if (
+            this.currentShotDiagnostic.visualOnsetTime === 0 &&
+            s.velocity.z < -0.2
+          ) {
+            this.currentShotDiagnostic.visualOnsetTime = this.time;
+          }
+          if (
             flyMotor?.arousal &&
             flyMotor.arousal > 0.25 &&
             this.currentShotDiagnostic.motorOnsetTime === 0
           ) {
             this.currentShotDiagnostic.motorOnsetTime = this.time;
+          }
+          if (flyMotor?.estimatedContactPoint) {
+            this.currentShotDiagnostic.predictedContactZ =
+              flyMotor.estimatedContactPoint[2];
+            if (!this.currentShotDiagnostic.flyZAtPrediction) {
+              this.currentShotDiagnostic.flyZAtPrediction = this.fly.z;
+            }
+            this.currentShotDiagnostic.depthError =
+              flyMotor.estimatedContactPoint[2] - (this.fly.z + 0.25);
+          }
+          if (flyMotor) {
+            this.currentShotDiagnostic.targetVz = flyMotor.vz;
+            this.currentShotDiagnostic.actualVz = flyMotor.vz;
+            this.currentShotDiagnostic.neuralLocomotorDrive =
+              flyMotor.biological?.locomotorDrive;
+            if (
+              flyMotor.vz < -0.2 &&
+              (!this.currentShotDiagnostic.retreatStartedTime ||
+                this.currentShotDiagnostic.retreatStartedTime === 0)
+            ) {
+              this.currentShotDiagnostic.retreatStartedTime = this.time;
+            }
           }
           if (
             flyMotor?.racketState === "PREPARE" &&
@@ -612,7 +702,11 @@ export class Game {
       this.ai.incoming(s, this.settings);
     } else {
       const interception = predictInterception(s, true);
-      this.targetPos = interception.target;
+      this.targetPos = v(
+        clamp(interception.target.x - 0.35, -2.4, 2.4),
+        0,
+        clamp(interception.target.z + 0.4, 1.8, 5.6),
+      );
       this.footworkState = "INTERCEPTING";
     }
   }
@@ -663,6 +757,36 @@ export class Game {
     }
 
     if (diag) {
+      const predZ = diag.predictedContactZ ?? s.p.z;
+      const isDeepShot =
+        predZ < -4.2 ||
+        (diag.depthError !== undefined && diag.depthError < -0.25);
+      if (isDeepShot) {
+        if (predZ < -6.5) {
+          diag.deepMissClassification = "UNREACHABLE_DEEP_SHOT";
+        } else if (!diag.retreatStartedTime || diag.retreatStartedTime === 0) {
+          diag.deepMissClassification = "NO_RETREAT";
+        } else if (
+          diag.retreatStartedTime -
+            (diag.visualOnsetTime || diag.motorOnsetTime || 0) >
+          0.45
+        ) {
+          diag.deepMissClassification = "RETREAT_TOO_LATE";
+        } else {
+          const flyZAtClosest = diag.flyAtClosest
+            ? diag.flyAtClosest[2]
+            : this.fly.z;
+          const remainingZGap = flyZAtClosest - (predZ + 0.35);
+          if (remainingZGap > 0.45) {
+            diag.deepMissClassification = "RETREAT_TOO_SLOW";
+          } else {
+            diag.deepMissClassification = "RACKET_MISS";
+          }
+        }
+      } else {
+        diag.deepMissClassification = "NONE";
+      }
+
       const vertDist = Math.abs(
         diag.racketAtClosest[1] - diag.shuttleAtClosest[1],
       );
@@ -681,7 +805,7 @@ export class Game {
   }
 
   feedSyntheticShot(
-    scenario: "left" | "right" | "center" | "high" | "fast" | "drop",
+    scenario: "left" | "right" | "center" | "high" | "fast" | "drop" | "deep",
     params?: {
       originOffset?: { x?: number; y?: number; z?: number };
       speedMultiplier?: number;
@@ -730,6 +854,10 @@ export class Game {
       target = v(0.6, 0.05, -1.8);
       intent = "drop";
       power = 0.45;
+    } else if (scenario === "deep") {
+      target = v(0, 0.05, -5.6);
+      intent = "clear";
+      power = 0.85;
     }
 
     if (params?.targetOffset) {

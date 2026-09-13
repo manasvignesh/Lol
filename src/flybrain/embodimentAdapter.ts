@@ -144,9 +144,9 @@ export class EmbodimentAdapter {
 
           // Reachable window: shuttle in fly court (z <= 0.2) and playable height (0.35m - 2.45m)
           if (simZ <= 0.2 && simZ >= -6.5 && simY >= 0.35 && simY <= 2.45) {
-            const distToFlyZ = Math.abs(simZ - (flyZ + 0.25));
-            const heightCost = Math.abs(simY - 1.45) * 0.4;
-            const score = distToFlyZ + heightCost;
+            const heightCost = Math.abs(simY - 1.45);
+            // Prioritize comfortable strike height (1.45m) and earlier descending contact
+            const score = heightCost * 2.8 + t * 0.15;
 
             if (score < minScore) {
               minScore = score;
@@ -169,33 +169,61 @@ export class EmbodimentAdapter {
       }
     }
 
-    // Longitudinal velocity mapping: Connectome thrust & braking modulated by incoming depth
+    // Longitudinal velocity mapping: Separate depth direction (geometry) from neural readiness (magnitude)
     let targetVz = 0;
+    const desiredFlyContactZ = flyZ + 0.25;
+    const depthError = contactPoint[2] - desiredFlyContactZ;
+    const neuralReadiness = Math.max(
+      bio.locomotorDrive,
+      bio.forwardThrust,
+      bio.escapeActivation,
+      bio.turnImpulse,
+    );
+
     if (
       sensoryInput &&
-      sensoryInput.shuttleVel[2] < -0.4 &&
-      bio.locomotorDrive > 0.15
+      sensoryInput.shuttleVel[2] < -0.3 &&
+      neuralReadiness > 0.06
     ) {
-      const depthDelta = contactPoint[2] - (flyZ + 0.25);
-      if (depthDelta > 0.35) {
-        // Forward surge for drop shots / net approaches
-        const fwdIntent = Math.min(1.0, depthDelta * 0.9);
+      if (depthError < -0.2) {
+        // BACKWARD RETREAT: Target is deep behind the fly
+        const depthMagnitude = Math.min(1.0, Math.abs(depthError) / 1.35);
+        const maxRetreatSpeed = mode === "demo-assist" ? 3.6 : 3.0;
+
+        // Modulated by biological arousal / braking / escape drive
+        // Crucially: positive forwardThrust does NOT reverse this retreat direction!
+        const biologicalRetreatModulation = Math.max(
+          0.4,
+          bio.locomotorDrive * 0.95,
+          bio.brakingDrive * 1.3,
+          bio.escapeActivation * 0.85,
+        );
+
         targetVz =
-          (bio.forwardThrust + fwdIntent * bio.locomotorDrive * 0.9) * 2.8 -
-          bio.brakingDrive * 2.8;
-      } else if (depthDelta < -0.35) {
-        // Backward retreat for deep clear shots
-        const backIntent = Math.min(1.0, -depthDelta * 0.9);
+          -depthMagnitude * maxRetreatSpeed * biologicalRetreatModulation;
+      } else if (depthError > 0.2) {
+        // FORWARD ADVANCE: Target is in front toward net (drop shot / short drive)
+        const depthMagnitude = Math.min(1.0, depthError / 1.2);
+        const maxAdvanceSpeed = mode === "demo-assist" ? 3.2 : 2.7;
+        const biologicalAdvanceModulation = Math.max(
+          0.4,
+          bio.forwardThrust * 1.1,
+          bio.locomotorDrive * 0.9,
+        );
+
         targetVz =
-          bio.forwardThrust * 2.6 -
-          (bio.brakingDrive + backIntent * bio.locomotorDrive * 0.9) * 2.8;
+          depthMagnitude * maxAdvanceSpeed * biologicalAdvanceModulation;
       } else {
-        targetVz = bio.forwardThrust * 2.6 - bio.brakingDrive * 2.8;
+        // Stabilizing hover near intercept zone
+        targetVz = bio.forwardThrust * 0.4 - bio.brakingDrive * 0.4;
       }
     } else {
-      targetVz = bio.forwardThrust * 2.6 - bio.brakingDrive * 2.8;
+      // Baseline hover / idle positioning
+      targetVz = bio.forwardThrust * 0.4 - bio.brakingDrive * 0.4;
     }
-    targetVz = Math.max(-2.8, Math.min(2.8, targetVz));
+
+    const maxSpeedLimit = mode === "demo-assist" ? 3.8 : 3.2;
+    targetVz = Math.max(-maxSpeedLimit, Math.min(maxSpeedLimit, targetVz));
     this.smoothedVz += (targetVz - this.smoothedVz) * smoothing;
 
     // Reset shot flag if shuttle is moving away from fly court

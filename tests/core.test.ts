@@ -334,9 +334,12 @@ describe("auto-footwork, contact envelope & timing windows", () => {
     g.step(1 / 120);
     expect(g.totalHits).toBe(0);
 
-    // Valid swing -> hit 1
+    // Valid swing with physical racket alignment -> hit 1
+    g.racket = v(0, 1.5, 3.8);
+    g.previousRacket = v(0, 1.5, 3.8);
     g.setMotion({
       ...neutralMotion(),
+      racket: v(0, 1.5, 3.85),
       confidence: 1,
       swing: true,
       swingId: 5,
@@ -421,6 +424,7 @@ describe("match and connected rallies", () => {
         else if (swing && step % 24 === 0) id++;
         g.setMotion({
           ...neutralMotion(),
+          racket: g.state === "ready" ? v(0.35, 1.05, 3.5) : v(0.5, 1.5, 3.4),
           confidence: 1,
           swing,
           swingId: id,
@@ -539,5 +543,154 @@ describe("match and connected rallies", () => {
     };
     out.step(C.dt);
     expect(out.match.score).toEqual([0, 1]);
+  });
+
+  describe("Physical Human Racket Contact & Ghost-Hit Prevention", () => {
+    it.each([8, 12, 16, 20])(
+      "rejects ghost hits at %i m/s shuttle speed when swing is not physically confirmed",
+      (speed) => {
+        const g = new Game({ ...defaults });
+        g.state = "rally";
+        g.playerPos = v(0, 0, 4.0);
+        g.shuttle = {
+          p: v(0, 1.4, 2.0),
+          prev: v(0, 1.4, 2.0),
+          velocity: v(0, 0, speed),
+          lastHit: 1,
+        };
+
+        // 1. Passive / No swing -> Shuttle flies past avatar without auto-hit
+        g.setMotion({ ...neutralMotion(), confidence: 1, swing: false });
+        for (let i = 0; i < 30; i++) {
+          g.step(1 / 120);
+        }
+        expect(g.totalHits).toBe(0);
+        expect(g.lastHumanDiagnostic?.hitRejectedReason).toBe(
+          "NO_CONFIRMED_SWING",
+        );
+
+        // Reset shuttle
+        g.state = "rally";
+        g.shuttle = {
+          p: v(0, 1.4, 2.0),
+          prev: v(0, 1.4, 2.0),
+          velocity: v(0, 0, speed),
+          lastHit: 1,
+        };
+
+        // 2. predictedSwing only -> MUST NEVER trigger hit
+        g.setMotion({
+          ...neutralMotion(),
+          confidence: 1,
+          predictedSwing: true,
+          swing: false,
+          swingId: 99,
+        });
+        for (let i = 0; i < 30; i++) {
+          g.step(1 / 120);
+        }
+        expect(g.totalHits).toBe(0);
+
+        // Reset shuttle
+        g.state = "rally";
+        g.shuttle = {
+          p: v(0, 1.4, 2.0),
+          prev: v(0, 1.4, 2.0),
+          velocity: v(0, 0, speed),
+          lastHit: 1,
+        };
+
+        // 3. Confirmed swing but racket is far on left side -> Misses
+        g.setMotion({
+          ...neutralMotion(),
+          racket: v(-1.5, 1.4, 3.4),
+          confidence: 1,
+          swing: true,
+          swingId: 100,
+          power: 0.7,
+        });
+        for (let i = 0; i < 30; i++) {
+          g.step(1 / 120);
+        }
+        expect(g.totalHits).toBe(0);
+        expect(g.lastHumanDiagnostic?.hitRejectedReason).toBe(
+          "NO_PHYSICAL_CONTACT",
+        );
+
+        // Reset shuttle
+        g.state = "rally";
+        g.shuttle = {
+          p: v(0, 1.4, 2.0),
+          prev: v(0, 1.4, 2.0),
+          velocity: v(0, 0, speed),
+          lastHit: 1,
+        };
+
+        // 4. Confirmed swing + swept racket intersection -> Exactly 1 hit accepted
+        g.shuttle = {
+          p: v(0, 1.4, 3.4),
+          prev: v(0, 1.4, 3.4),
+          velocity: v(0, 0, speed),
+          lastHit: 1,
+        };
+        g.racket = v(0, 1.4, 3.6);
+        g.previousRacket = v(0, 1.4, 3.6);
+        g.setMotion({
+          ...neutralMotion(),
+          racket: v(0, 1.4, 3.85),
+          confidence: 1,
+          swing: true,
+          swingId: 101,
+          power: 0.8,
+        });
+        let hitRecorded = false;
+        for (let i = 0; i < 30; i++) {
+          g.step(1 / 120);
+          if (g.totalHits === 1) {
+            hitRecorded = true;
+            break;
+          }
+        }
+        expect(hitRecorded).toBe(true);
+        expect(g.lastHumanDiagnostic?.hitAccepted).toBe(true);
+        expect(g.lastHumanDiagnostic?.hitRejectedReason).toBe("NONE");
+      },
+    );
+
+    it("verifies hand waves and wrist gestures away from shuttle do not alter velocity or launch serve", () => {
+      const g = new Game({ ...defaults });
+      g.ready();
+
+      // Hand wave far above or away from held shuttle
+      g.setMotion({
+        ...neutralMotion(),
+        racket: v(-1.2, 2.6, 2.0),
+        confidence: 0.95,
+        swing: true,
+        swingId: 12,
+        power: 0.8,
+      });
+      for (let i = 0; i < 15; i++) {
+        g.step(1 / 120);
+      }
+      // Serve must NOT have triggered
+      expect(g.state).toBe("ready");
+      expect(g.totalHits).toBe(0);
+
+      // Now swing with racket passing directly through held shuttle
+      g.racket = v(0.35, 1.05, 3.5);
+      g.previousRacket = v(0.35, 1.05, 3.5);
+      g.setMotion({
+        ...neutralMotion(),
+        racket: v(0.35, 1.05, 3.5),
+        confidence: 1.0,
+        swing: true,
+        swingId: 13,
+        power: 0.75,
+      });
+      g.step(1 / 120);
+      expect(g.state).toBe("rally");
+      expect(g.totalHits).toBe(1);
+    });
   });
 });

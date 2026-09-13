@@ -24,7 +24,8 @@ export const C = {
   intentBoost: 1.35,
   intentPenalty: { beginner: 0.9, normal: 0.68 },
   timingWindow: { beginner: 0.35, normal: 0.2 },
-  contactEnvelope: { beginner: 1.45, normal: 0.9 },
+  contactEnvelope: { beginner: 0.38, normal: 0.28 },
+  racketBladeRadius: { beginner: 0.38, normal: 0.28 },
   assist: { beginner: 1.05, normal: 0.58 },
   shotCorrection: { beginner: 1.0, normal: 0.4 },
   ai: {

@@ -300,6 +300,48 @@ export interface FlyContactDiagnostic {
   neuralReadiness: number;
   mode: "scientific" | "demo-assist";
   timingErrorMs?: number;
+  predictedContactZ?: number;
+  flyZAtPrediction?: number;
+  flyZAtClosest?: number;
+  depthError?: number;
+  targetVz?: number;
+  actualVz?: number;
+  neuralLocomotorDrive?: number;
+  retreatStartedTime?: number;
+  deepMissClassification?:
+    | "NO_RETREAT"
+    | "RETREAT_TOO_LATE"
+    | "RETREAT_TOO_SLOW"
+    | "RACKET_MISS"
+    | "UNREACHABLE_DEEP_SHOT"
+    | "NONE";
+}
+
+export type HumanHitRejectedReason =
+  | "NO_CONFIRMED_SWING"
+  | "NO_PHYSICAL_CONTACT"
+  | "SWING_ALREADY_USED"
+  | "SHUTTLE_WRONG_SIDE"
+  | "STALE_SWING"
+  | "TRACKING_UNSTABLE"
+  | "PASSIVE_RACKET"
+  | "NONE";
+
+export interface HumanContactDiagnostic {
+  time: number;
+  humanSwingId: number;
+  predictedSwing: boolean;
+  confirmedSwing: boolean;
+  motionState: string;
+  racketPrev: [number, number, number];
+  racketCurrent: [number, number, number];
+  shuttlePrev: [number, number, number];
+  shuttleCurrent: [number, number, number];
+  sweptDistance: number;
+  contactRadius: number;
+  contactTime: number;
+  hitAccepted: boolean;
+  hitRejectedReason: HumanHitRejectedReason;
 }
 
 export interface NeuronMorphologyMeta {

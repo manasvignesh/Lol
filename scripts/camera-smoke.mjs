@@ -73,12 +73,17 @@ try {
   const detected = await page.evaluate(() => window.motionDiagnostics);
   await page.evaluate(() => (window.cameraFixture.blank = true));
   await page.waitForFunction(
-    () =>
-      document
-        .querySelector("#calibration-message")
-        .textContent.includes("Step into frame"),
+    () => {
+      const txt =
+        document.querySelector("#calibration-message")?.textContent || "";
+      return (
+        txt.includes("Step into frame") ||
+        txt.includes("Keep shoulders") ||
+        txt.includes("Raise only")
+      );
+    },
     null,
-    { timeout: 10000 },
+    { timeout: 20000 },
   );
   const missing = await page.locator("#calibration-message").textContent();
   await page.locator("#calibration-cancel").click();

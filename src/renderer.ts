@@ -2,6 +2,7 @@ import * as T from "three";
 import type { Game } from "./game";
 import { predict } from "./physics";
 import { clamp, type V3 } from "./math";
+import { C } from "./config";
 export class CourtRenderer {
   scene = new T.Scene();
   camera = new T.PerspectiveCamera(47, 1, 0.1, 100);
@@ -21,6 +22,7 @@ export class CourtRenderer {
   predictionClock = 0;
   armSegments: T.Mesh[] = [];
   opponentRacket = new T.Group();
+  debugRacketSphere: T.Mesh;
   constructor(container: HTMLElement) {
     this.renderer = new T.WebGLRenderer({
       antialias: true,
@@ -136,6 +138,17 @@ export class CourtRenderer {
     this.scene.add(this.racket);
     this.opponentRacket = this.racket.clone();
     this.scene.add(this.opponentRacket);
+    this.debugRacketSphere = new T.Mesh(
+      new T.SphereGeometry(0.28, 16, 16),
+      new T.MeshBasicMaterial({
+        color: 0x00ffcc,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.45,
+      }),
+    );
+    this.debugRacketSphere.visible = false;
+    this.scene.add(this.debugRacketSphere);
     for (let i = 0; i < 4; i++) {
       const arm = new T.Mesh(
         new T.CylinderGeometry(0.055, 0.065, 1, 8),
@@ -413,6 +426,19 @@ export class CourtRenderer {
       game.motion.forearm.x,
       game.motion.forearm.y || 0.001,
     );
+
+    if (game.settings.debug) {
+      this.debugRacketSphere.visible = true;
+      this.debugRacketSphere.position.set(
+        game.racket.x,
+        game.racket.y,
+        game.racket.z,
+      );
+      const rBlade = C.racketBladeRadius[game.settings.assist] || 0.28;
+      this.debugRacketSphere.scale.setScalar(rBlade / 0.28);
+    } else {
+      this.debugRacketSphere.visible = false;
+    }
     const hand = new T.Vector3(0, -0.55, 0)
       .applyQuaternion(this.racket.quaternion)
       .add(this.racket.position);
