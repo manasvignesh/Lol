@@ -45,10 +45,11 @@ export class NeuralBridge {
   async init(
     preferWorker: boolean = true,
     baseUrl: string = "/data/connectome",
+    seed?: number,
   ) {
     try {
       this.graph = await ConnectomeLoader.load(baseUrl);
-      this.localEngine = new NeuralEngine(this.graph);
+      this.localEngine = new NeuralEngine(this.graph, { seed });
 
       if (
         preferWorker &&

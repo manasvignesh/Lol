@@ -35,8 +35,8 @@ export class FlyOpponent {
     this.bridge = new NeuralBridge();
   }
 
-  async init(preferWorker = true, baseUrl = "/data/connectome") {
-    await this.bridge.init(preferWorker, baseUrl);
+  async init(preferWorker = true, baseUrl = "/data/connectome", seed?: number) {
+    await this.bridge.init(preferWorker, baseUrl, seed);
   }
 
   reset() {

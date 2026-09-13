@@ -658,11 +658,22 @@ export class Game {
 
   feedSyntheticShot(
     scenario: "left" | "right" | "center" | "high" | "fast" | "drop",
+    params?: {
+      originOffset?: { x?: number; y?: number; z?: number };
+      speedMultiplier?: number;
+      anglePerturbation?: { yaw?: number; pitch?: number };
+      targetOffset?: { x?: number; y?: number; z?: number };
+    },
   ) {
     this.ready();
     const startPos = scenario === "fast" ? v(0, 2.4, 3.8) : v(0, 1.2, 3.8);
-    this.playerPos = v(0, 0, C.playerBase.z);
-    this.racket = v(0.3, 1.4, 3.4);
+    if (params?.originOffset) {
+      startPos.x += params.originOffset.x ?? 0;
+      startPos.y += params.originOffset.y ?? 0;
+      startPos.z += params.originOffset.z ?? 0;
+    }
+    this.playerPos = v(startPos.x, 0, C.playerBase.z);
+    this.racket = v(startPos.x + 0.3, startPos.y + 0.2, startPos.z - 0.4);
     this.shuttle.p = { ...startPos };
     this.shuttle.prev = { ...startPos };
     this.fly.swingAttempted = false;
@@ -697,7 +708,36 @@ export class Game {
       power = 0.45;
     }
 
+    if (params?.targetOffset) {
+      target.x += params.targetOffset.x ?? 0;
+      target.y += params.targetOffset.y ?? 0;
+      target.z += params.targetOffset.z ?? 0;
+    }
+
     this.shuttle.velocity = shotVelocity(this.shuttle.p, target, intent, power);
+
+    if (params?.anglePerturbation) {
+      const { yaw = 0, pitch = 0 } = params.anglePerturbation;
+      const cosP = Math.cos(pitch);
+      const sinP = Math.sin(pitch);
+      const vy1 =
+        this.shuttle.velocity.y * cosP - this.shuttle.velocity.z * sinP;
+      const vz1 =
+        this.shuttle.velocity.y * sinP + this.shuttle.velocity.z * cosP;
+      const cosY = Math.cos(yaw);
+      const sinY = Math.sin(yaw);
+      const vx2 = this.shuttle.velocity.x * cosY + vz1 * sinY;
+      const vz2 = -this.shuttle.velocity.x * sinY + vz1 * cosY;
+      this.shuttle.velocity.x = vx2;
+      this.shuttle.velocity.y = vy1;
+      this.shuttle.velocity.z = vz2;
+    }
+
+    if (params?.speedMultiplier) {
+      this.shuttle.velocity.x *= params.speedMultiplier;
+      this.shuttle.velocity.y *= params.speedMultiplier;
+      this.shuttle.velocity.z *= params.speedMultiplier;
+    }
     this.shuttle.lastHit = 0;
     this.state = "rally";
     this.lastContact = this.time;
